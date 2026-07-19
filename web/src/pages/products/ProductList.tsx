@@ -11,9 +11,10 @@ import {
 } from "antd";
 import {
   PlusOutlined, SearchOutlined, ReloadOutlined,
-  EditOutlined, DeleteOutlined, EyeOutlined,
+  EditOutlined, DeleteOutlined, EyeOutlined, RobotOutlined,
 } from "@ant-design/icons";
 import { productApi, type ProductListQuery, type CreateProductInput } from "../../api/product";
+import { aiApi, type ProviderInfo } from "../../api/b2b";
 import { ApiError } from "../../api/client";
 import type { Product, DataSource } from "../../types";
 
@@ -46,6 +47,11 @@ export default function ProductList() {
   const [detailDrawer, setDetailDrawer] = useState<{ open: boolean; product?: Product }>({ open: false });
   const [form] = Form.useForm();
 
+  // AI 分析状态
+  const [analyzing, setAnalyzing] = useState(false);
+  const [analysis, setAnalysis] = useState<any>(null);
+  const [providers, setProviders] = useState<ProviderInfo[]>([]);
+
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
@@ -64,6 +70,27 @@ export default function ProductList() {
   useEffect(() => {
     productApi.categories().then(setCategories).catch(() => {});
   }, []);
+
+  // 加载 AI providers
+  useEffect(() => {
+    aiApi.providers().then((r) => setProviders(r.providers || [])).catch(() => {});
+  }, []);
+
+  // AI 分析商品
+  const onAnalyze = async (productId: number) => {
+    setAnalyzing(true);
+    setAnalysis(null);
+    try {
+      const result = await aiApi.analyzeProduct(productId);
+      setAnalysis(result);
+      message.success("AI 分析完成");
+      fetchData(); // 刷新列表（ai_score 已回写）
+    } catch (e) {
+      message.error((e as ApiError).message || "AI 分析失败，请检查 AI Key 配置");
+    } finally {
+      setAnalyzing(false);
+    }
+  };
 
   // 搜索
   const onSearch = (value: string) => {
@@ -218,10 +245,10 @@ export default function ProductList() {
     },
     {
       title: "操作",
-      width: 140,
+      width: 180,
       render: (_, r) => (
         <Space size="small">
-          <Button type="link" size="small" icon={<EyeOutlined />} onClick={() => setDetailDrawer({ open: true, product: r })} />
+          <Button type="link" size="small" icon={<EyeOutlined />} onClick={() => { setAnalysis(null); setDetailDrawer({ open: true, product: r }); }} />
           <Button type="link" size="small" icon={<EditOutlined />} onClick={() => onEdit(r)} />
           <Popconfirm title="确定删除？" onConfirm={() => onDelete(r.id)} okText="删除" cancelText="取消" okButtonProps={{ danger: true }}>
             <Button type="link" size="small" danger icon={<DeleteOutlined />} />
@@ -347,12 +374,107 @@ export default function ProductList() {
         title="商品详情"
         open={detailDrawer.open}
         onClose={() => setDetailDrawer({ open: false })}
-        width={520}
+        width={560}
       >
         {detailDrawer.product && (
-          <ProductDetail product={detailDrawer.product} images={parseImages(detailDrawer.product)} scenarios={parseScenarios(detailDrawer.product)} />
+          <>
+            <ProductDetail product={detailDrawer.product} images={parseImages(detailDrawer.product)} scenarios={parseScenarios(detailDrawer.product)} />
+
+            {/* AI 分析区块 */}
+            <div style={{ marginTop: 24, padding: 16, background: "#f6f8fa", borderRadius: 8 }}>
+              <div style={{ display: "flex", alignItems: "center", marginBottom: 12 }}>
+                <span style={{ fontWeight: 600, fontSize: 14 }}>🤖 AI 选品分析</span>
+                <div style={{ flex: 1 }} />
+                <Button
+                  type="primary"
+                  size="small"
+                  loading={analyzing}
+                  icon={<RobotOutlined />}
+                  onClick={() => onAnalyze(detailDrawer.product!.id)}
+                  disabled={providers.length > 0 && !providers.some((p) => p.configured)}
+                >
+                  {analyzing ? "分析中..." : "开始分析"}
+                </Button>
+              </div>
+              {providers.length > 0 && !providers.some((p) => p.configured) && (
+                <div style={{ fontSize: 12, color: "#faad14" }}>
+                  ⚠️ 未配置任何 AI Key，请在首启向导或系统设置中配置 DeepSeek/OpenAI/Qwen Key
+                </div>
+              )}
+              {analysis && <AIAnalysisResult data={analysis} />}
+            </div>
+          </>
         )}
       </Drawer>
+    </div>
+  );
+}
+
+// AI 分析结果展示组件
+function AIAnalysisResult({ data }: { data: any }) {
+  return (
+    <div style={{ fontSize: 13 }}>
+      {data.score > 0 && (
+        <div style={{ marginBottom: 8 }}>
+          <span style={{ fontWeight: 600 }}>综合评分：</span>
+          <Tag color={Number(data.score) >= 8 ? "green" : Number(data.score) >= 5 ? "orange" : "red"} style={{ fontSize: 14, padding: "2px 12px" }}>
+            {data.score} / 10
+          </Tag>
+          <span style={{ color: "#999", marginLeft: 8 }}>by {data.provider}</span>
+        </div>
+      )}
+      {data.sourcing_advice && (
+        <div style={{ marginBottom: 8 }}>
+          <div style={{ fontWeight: 600, color: "#1677ff" }}>💡 选品建议</div>
+          <div style={{ color: "#555" }}>{data.sourcing_advice}</div>
+        </div>
+      )}
+      {data.price_analysis && (
+        <div style={{ marginBottom: 8 }}>
+          <div style={{ fontWeight: 600, color: "#1677ff" }}>💰 定价分析</div>
+          <div style={{ color: "#555" }}>{data.price_analysis}</div>
+        </div>
+      )}
+      {data.market_outlook && (
+        <div style={{ marginBottom: 8 }}>
+          <div style={{ fontWeight: 600, color: "#1677ff" }}>📈 市场前景</div>
+          <div style={{ color: "#555" }}>{data.market_outlook}</div>
+        </div>
+      )}
+      {data.risk_warnings?.length > 0 && (
+        <div style={{ marginBottom: 8 }}>
+          <div style={{ fontWeight: 600, color: "#ff4d4f" }}>⚠️ 风险提示</div>
+          <ul style={{ margin: "4px 0", paddingLeft: 20, color: "#555" }}>
+            {data.risk_warnings.map((w: string, i: number) => <li key={i}>{w}</li>)}
+          </ul>
+        </div>
+      )}
+      {data.recommended_actions?.length > 0 && (
+        <div style={{ marginBottom: 8 }}>
+          <div style={{ fontWeight: 600, color: "#52c41a" }}>✅ 建议动作</div>
+          <ul style={{ margin: "4px 0", paddingLeft: 20, color: "#555" }}>
+            {data.recommended_actions.map((a: string, i: number) => <li key={i}>{a}</li>)}
+          </ul>
+        </div>
+      )}
+      {data.target_markets?.length > 0 && (
+        <div style={{ marginBottom: 8 }}>
+          <div style={{ fontWeight: 600, color: "#722ed1" }}>🌍 推荐目标市场</div>
+          <div>{data.target_markets.map((m: string) => <Tag key={m} color="purple">{m}</Tag>)}</div>
+        </div>
+      )}
+      {data.b2b_suitability && (
+        <div style={{ marginBottom: 8 }}>
+          <div style={{ fontWeight: 600 }}>B2B 适配度</div>
+          <div style={{ color: "#555" }}>{data.b2b_suitability}</div>
+        </div>
+      )}
+      {data.b2c_suitability && (
+        <div>
+          <div style={{ fontWeight: 600 }}>B2C 适配度</div>
+          <div style={{ color: "#555" }}>{data.b2c_suitability}</div>
+        </div>
+      )}
     </div>
   );
 }

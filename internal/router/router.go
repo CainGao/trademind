@@ -69,6 +69,9 @@ func New(cfg *config.Config, db *gorm.DB) *gin.Engine {
 	productRepo := repository.NewProductRepo(db)
 	supplierRepo := repository.NewSupplierRepo(db)
 	behaviorRepo := repository.NewBehaviorRepo(db)
+	customerRepo := repository.NewCustomerRepo(db)
+	inquiryRepo := repository.NewInquiryRepo(db)
+	quotationRepo := repository.NewQuotationRepo(db)
 
 	// Service
 	authSvc := service.NewAuthService(userRepo, auditRepo, jwtMgr)
@@ -77,6 +80,11 @@ func New(cfg *config.Config, db *gorm.DB) *gin.Engine {
 	extensionSvc := service.NewExtensionService(productRepo, supplierRepo, behaviorRepo)
 	supplierSvc := service.NewSupplierService(supplierRepo)
 	statsSvc := service.NewStatsService(behaviorRepo, productRepo, supplierRepo)
+	aiSvc := service.NewAIService(settingRepo, encryptor)
+	agentSvc := service.NewAgentService(aiSvc, productRepo)
+	customerSvc := service.NewCustomerService(customerRepo)
+	inquirySvc := service.NewInquiryService(inquiryRepo)
+	quotationSvc := service.NewQuotationService(quotationRepo)
 
 	// Handler
 	authHandler := handler.NewAuthHandler(authSvc)
@@ -85,6 +93,8 @@ func New(cfg *config.Config, db *gorm.DB) *gin.Engine {
 	extensionHandler := handler.NewExtensionHandler(extensionSvc)
 	supplierHandler := handler.NewSupplierHandler(supplierSvc)
 	statsHandler := handler.NewStatsHandler(statsSvc)
+	aiHandler := handler.NewAIHandler(aiSvc, agentSvc)
+	b2bHandler := handler.NewB2BHandler(customerSvc, inquirySvc, quotationSvc)
 
 	// ===== 健康检查（公开）=====
 	r.GET("/health", func(c *gin.Context) {
@@ -124,6 +134,12 @@ func New(cfg *config.Config, db *gorm.DB) *gin.Engine {
 
 		// 行为统计（驾驶舱数据源）
 		statsHandler.RegisterRoutes(protected)
+
+		// AI 网关 + Agent
+		aiHandler.RegisterRoutes(protected)
+
+		// B2B 客户/询盘/报价单
+		b2bHandler.RegisterRoutes(protected)
 
 		// Chrome 插件对接（采集 / 行为 / 状态）
 		extensionHandler.RegisterRoutes(protected)
