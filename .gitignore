@@ -26,6 +26,13 @@ coverage.txt
 web/node_modules/
 web/dist/
 web/.vite/
+# TypeScript 编译产物（tsc --build 生成）
+web/**/*.js
+web/**/*.js.map
+web/**/*.d.ts
+web/tsconfig.tsbuildinfo
+!web/vite.config.ts
+!web/embed.go
 
 # IDE
 .vscode/
