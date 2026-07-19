@@ -21,6 +21,8 @@ import SetupPage from "./pages/setup/SetupPage";
 import MainLayout from "./components/MainLayout";
 import DashboardPage from "./pages/dashboard/DashboardPage";
 import ProductList from "./pages/products/ProductList";
+import SupplierList from "./pages/suppliers/SupplierList";
+import Cockpit from "./pages/cockpit/Cockpit";
 import Placeholder from "./components/Placeholder";
 import { RobotOutlined } from "@ant-design/icons";
 
@@ -82,7 +84,7 @@ export default function App() {
               <Route index element={<Navigate to="/dashboard" replace />} />
               <Route path="dashboard" element={<DashboardPage />} />
               <Route path="products" element={<ProductList />} />
-              <Route path="suppliers" element={<Placeholder title="供应商" />} />
+              <Route path="suppliers" element={<SupplierList />} />
               <Route path="customers" element={<Placeholder title="客户管理（B2B）" />} />
               <Route path="inquiries" element={<Placeholder title="询盘管理（B2B）" />} />
               <Route path="quotations" element={<Placeholder title="报价单（B2B）" />} />
@@ -90,7 +92,7 @@ export default function App() {
               <Route path="listings" element={<Placeholder title="上架商品（B2C）" />} />
               <Route path="orders" element={<Placeholder title="订单管理（B2C）" />} />
               <Route path="agents" element={<Placeholder title="AI Agent" icon={<RobotOutlined />} />} />
-              <Route path="cockpit" element={<Placeholder title="老板驾驶舱" />} />
+              <Route path="cockpit" element={<Cockpit />} />
               <Route path="settings" element={<Placeholder title="系统设置" />} />
               <Route path="*" element={<Navigate to="/dashboard" replace />} />
             </Route>

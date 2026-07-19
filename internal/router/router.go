@@ -75,12 +75,16 @@ func New(cfg *config.Config, db *gorm.DB) *gin.Engine {
 	setupSvc := service.NewSetupService(companyRepo, settingRepo, userRepo, encryptor)
 	productSvc := service.NewProductService(productRepo)
 	extensionSvc := service.NewExtensionService(productRepo, supplierRepo, behaviorRepo)
+	supplierSvc := service.NewSupplierService(supplierRepo)
+	statsSvc := service.NewStatsService(behaviorRepo, productRepo, supplierRepo)
 
 	// Handler
 	authHandler := handler.NewAuthHandler(authSvc)
 	setupHandler := handler.NewSetupHandler(setupSvc)
 	productHandler := handler.NewProductHandler(productSvc)
 	extensionHandler := handler.NewExtensionHandler(extensionSvc)
+	supplierHandler := handler.NewSupplierHandler(supplierSvc)
+	statsHandler := handler.NewStatsHandler(statsSvc)
 
 	// ===== 健康检查（公开）=====
 	r.GET("/health", func(c *gin.Context) {
@@ -114,6 +118,12 @@ func New(cfg *config.Config, db *gorm.DB) *gin.Engine {
 
 		// 商品中心（CRUD）
 		productHandler.RegisterRoutes(protected)
+
+		// 供应商（列表/详情/评分/总览）
+		supplierHandler.RegisterRoutes(protected)
+
+		// 行为统计（驾驶舱数据源）
+		statsHandler.RegisterRoutes(protected)
 
 		// Chrome 插件对接（采集 / 行为 / 状态）
 		extensionHandler.RegisterRoutes(protected)
