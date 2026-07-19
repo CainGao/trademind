@@ -40,6 +40,12 @@ func (r *UserRepo) Create(u *models.User) error {
 	return r.DB.Create(u).Error
 }
 
+// ChangePassword 改密码。
+func (r *UserRepo) ChangePassword(id uint, newHash string) error {
+	return r.DB.Model(&models.User{}).Where("id = ?", id).
+		Update("password_hash", newHash).Error
+}
+
 // UpdateLastLogin 更新最后登录时间。
 func (r *UserRepo) UpdateLastLogin(id uint, at time.Time) error {
 	return r.DB.Model(&models.User{}).Where("id = ?", id).
