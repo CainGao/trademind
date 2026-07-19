@@ -2,6 +2,8 @@
 package repository
 
 import (
+	"time"
+
 	"github.com/CainGao/trademind/internal/models"
 	"gorm.io/gorm"
 )
@@ -36,6 +38,12 @@ func (r *UserRepo) GetByID(id uint) (*models.User, error) {
 // Create 创建用户。
 func (r *UserRepo) Create(u *models.User) error {
 	return r.DB.Create(u).Error
+}
+
+// UpdateLastLogin 更新最后登录时间。
+func (r *UserRepo) UpdateLastLogin(id uint, at time.Time) error {
+	return r.DB.Model(&models.User{}).Where("id = ?", id).
+		Update("last_login_at", at).Error
 }
 
 // List 分页列表（规范 V1.0 §3.3 分页参数）。
