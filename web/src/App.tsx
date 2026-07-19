@@ -24,8 +24,10 @@ import ProductList from "./pages/products/ProductList";
 import SupplierList from "./pages/suppliers/SupplierList";
 import CustomerList from "./pages/customers/CustomerList";
 import Cockpit from "./pages/cockpit/Cockpit";
+import AgentList from "./pages/agents/AgentList";
+import StoreList from "./pages/stores/StoreList";
+import OrderList from "./pages/orders/OrderList";
 import Placeholder from "./components/Placeholder";
-import { RobotOutlined } from "@ant-design/icons";
 
 // 需登录的路由守卫
 function PrivateRoute({ children }: { children: React.ReactNode }) {
@@ -89,10 +91,10 @@ export default function App() {
               <Route path="customers" element={<CustomerList />} />
               <Route path="inquiries" element={<Placeholder title="询盘管理（B2B）" />} />
               <Route path="quotations" element={<Placeholder title="报价单（B2B）" />} />
-              <Route path="stores" element={<Placeholder title="店铺管理（B2C）" />} />
+              <Route path="stores" element={<StoreList />} />
               <Route path="listings" element={<Placeholder title="上架商品（B2C）" />} />
-              <Route path="orders" element={<Placeholder title="订单管理（B2C）" />} />
-              <Route path="agents" element={<Placeholder title="AI Agent" icon={<RobotOutlined />} />} />
+              <Route path="orders" element={<OrderList />} />
+              <Route path="agents" element={<AgentList />} />
               <Route path="cockpit" element={<Cockpit />} />
               <Route path="settings" element={<Placeholder title="系统设置" />} />
               <Route path="*" element={<Navigate to="/dashboard" replace />} />

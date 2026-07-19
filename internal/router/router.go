@@ -72,6 +72,10 @@ func New(cfg *config.Config, db *gorm.DB) *gin.Engine {
 	customerRepo := repository.NewCustomerRepo(db)
 	inquiryRepo := repository.NewInquiryRepo(db)
 	quotationRepo := repository.NewQuotationRepo(db)
+	storeRepo := repository.NewStoreRepo(db)
+	listingRepo := repository.NewListingRepo(db)
+	orderRepo := repository.NewOrderRepo(db)
+	agentRepo := repository.NewAgentRepo(db)
 
 	// Service
 	authSvc := service.NewAuthService(userRepo, auditRepo, jwtMgr)
@@ -81,7 +85,9 @@ func New(cfg *config.Config, db *gorm.DB) *gin.Engine {
 	supplierSvc := service.NewSupplierService(supplierRepo)
 	statsSvc := service.NewStatsService(behaviorRepo, productRepo, supplierRepo)
 	aiSvc := service.NewAIService(settingRepo, encryptor)
-	agentSvc := service.NewAgentService(aiSvc, productRepo)
+	agentSvc := service.NewAgentService(aiSvc, productRepo, supplierRepo, behaviorRepo, agentRepo)
+	schedSvc := service.NewSchedulerService(agentSvc, settingRepo)
+	b2cSvc := service.NewB2CService(storeRepo, listingRepo, orderRepo)
 	customerSvc := service.NewCustomerService(customerRepo)
 	inquirySvc := service.NewInquiryService(inquiryRepo)
 	quotationSvc := service.NewQuotationService(quotationRepo)
@@ -95,6 +101,17 @@ func New(cfg *config.Config, db *gorm.DB) *gin.Engine {
 	statsHandler := handler.NewStatsHandler(statsSvc)
 	aiHandler := handler.NewAIHandler(aiSvc, agentSvc)
 	b2bHandler := handler.NewB2BHandler(customerSvc, inquirySvc, quotationSvc)
+	agentHandler := handler.NewAgentHandler(agentSvc, schedSvc)
+	b2cHandler := handler.NewB2CHandler(b2cSvc)
+
+	// 启动 Agent 定时调度器（选品/采购 Agent，默认每天 9:00 / 10:00）
+	// 即使没有配置 AI Key 也启动——任务会失败但记录到 agent_runs，老板能在前端看到。
+	go func() {
+		if err := schedSvc.Start(); err != nil {
+			// 调度器启动失败不阻塞 HTTP 服务，只记录日志
+			_ = err // log 会在 scheduler_service.go 里打
+		}
+	}()
 
 	// ===== 健康检查（公开）=====
 	r.GET("/health", func(c *gin.Context) {
@@ -140,6 +157,29 @@ func New(cfg *config.Config, db *gorm.DB) *gin.Engine {
 
 		// B2B 客户/询盘/报价单
 		b2bHandler.RegisterRoutes(protected)
+
+		// Agent 任务管理（选品/采购 Agent + 运行历史 + 定时配置）
+		agents := protected.Group("/agents")
+		agents.POST("/run", agentHandler.Run)
+		agents.POST("/analyze-product", agentHandler.AnalyzeProduct)
+		agents.GET("/runs", agentHandler.ListRuns)
+		agents.GET("/runs/:id", agentHandler.GetRun)
+		agents.GET("/schedule", agentHandler.GetSchedule)
+		agents.PUT("/schedule", agentHandler.UpdateSchedule)
+
+		// B2C 跨境电商（店铺/上架/订单）
+		b2c := protected.Group("/b2c")
+		b2c.GET("/stores", b2cHandler.ListStores)
+		b2c.POST("/stores", b2cHandler.CreateStore)
+		b2c.PUT("/stores/:id", b2cHandler.UpdateStore)
+		b2c.DELETE("/stores/:id", b2cHandler.DeleteStore)
+		b2c.GET("/listings", b2cHandler.ListListings)
+		b2c.POST("/listings", b2cHandler.CreateListing)
+		b2c.PUT("/listings/:id", b2cHandler.UpdateListing)
+		b2c.GET("/orders", b2cHandler.ListOrders)
+		b2c.POST("/orders", b2cHandler.CreateOrder)
+		b2c.PUT("/orders/:id/status", b2cHandler.UpdateOrderStatus)
+		b2c.GET("/overview", b2cHandler.Overview)
 
 		// Chrome 插件对接（采集 / 行为 / 状态）
 		extensionHandler.RegisterRoutes(protected)
