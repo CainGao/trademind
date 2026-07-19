@@ -25,6 +25,7 @@ import SupplierList from "./pages/suppliers/SupplierList";
 import CustomerList from "./pages/customers/CustomerList";
 import Cockpit from "./pages/cockpit/Cockpit";
 import AgentList from "./pages/agents/AgentList";
+import SpecialAgents from "./pages/agents/SpecialAgents";
 import StoreList from "./pages/stores/StoreList";
 import OrderList from "./pages/orders/OrderList";
 import Placeholder from "./components/Placeholder";
@@ -95,6 +96,7 @@ export default function App() {
               <Route path="listings" element={<Placeholder title="上架商品（B2C）" />} />
               <Route path="orders" element={<OrderList />} />
               <Route path="agents" element={<AgentList />} />
+              <Route path="agents-special" element={<SpecialAgents />} />
               <Route path="cockpit" element={<Cockpit />} />
               <Route path="settings" element={<Placeholder title="系统设置" />} />
               <Route path="*" element={<Navigate to="/dashboard" replace />} />

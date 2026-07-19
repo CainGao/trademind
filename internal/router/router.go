@@ -166,6 +166,12 @@ func New(cfg *config.Config, db *gorm.DB) *gin.Engine {
 		agents.GET("/runs/:id", agentHandler.GetRun)
 		agents.GET("/schedule", agentHandler.GetSchedule)
 		agents.PUT("/schedule", agentHandler.UpdateSchedule)
+		// Week 6 专用 Agent
+		agents.POST("/analyze-email", agentHandler.AnalyzeEmail)
+		agents.POST("/analyze-inquiry", agentHandler.AnalyzeInquiry)
+		agents.POST("/advise-quotation", agentHandler.AdviseQuotation)
+		agents.POST("/optimize-listing", agentHandler.OptimizeListing)
+		agents.POST("/analyze-reviews", agentHandler.AnalyzeReviews)
 
 		// B2C 跨境电商（店铺/上架/订单）
 		b2c := protected.Group("/b2c")

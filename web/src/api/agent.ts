@@ -83,4 +83,49 @@ export const agentApi = {
       cron,
     });
   },
+
+  // ===== Week 6 专用 Agent =====
+
+  /** 邮件分析 Agent */
+  analyzeEmail(subject: string, content: string) {
+    return client.post<unknown, { analysis: any; run: AgentRun }>(
+      "/agents/analyze-email",
+      { subject, content }
+    );
+  },
+
+  /** 询盘分析 Agent */
+  analyzeInquiry(inquiry_id: number) {
+    return client.post<unknown, { analysis: any; run: AgentRun }>(
+      "/agents/analyze-inquiry",
+      null,
+      { params: { inquiry_id } }
+    );
+  },
+
+  /** 报价建议 Agent */
+  adviseQuotation(inquiry_id: number, product_id: number) {
+    return client.post<unknown, { advice: any; run: AgentRun }>(
+      "/agents/advise-quotation",
+      null,
+      { params: { inquiry_id, product_id } }
+    );
+  },
+
+  /** 上架优化 Agent */
+  optimizeListing(product_id: number, platform = "amazon") {
+    return client.post<unknown, { optimization: any; run: AgentRun }>(
+      "/agents/optimize-listing",
+      null,
+      { params: { product_id, platform } }
+    );
+  },
+
+  /** 评论分析 Agent */
+  analyzeReviews(reviews: string) {
+    return client.post<unknown, { analysis: any; run: AgentRun }>(
+      "/agents/analyze-reviews",
+      { reviews }
+    );
+  },
 };

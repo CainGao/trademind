@@ -143,3 +143,104 @@ func (h *AgentHandler) UpdateSchedule(c *gin.Context) {
 	}
 	response.Success(c, h.schedSvc.AllSchedule())
 }
+
+// ============================================================================
+// Week 6 新增：B2B 专用 Agent（邮件/询盘/报价）+ B2C 专用 Agent（上架/评论）
+// ============================================================================
+
+// EmailAnalysisReq 邮件分析请求体。
+type EmailAnalysisReq struct {
+	Subject string `json:"subject" binding:"required"`
+	Content string `json:"content" binding:"required"`
+}
+
+// AnalyzeEmail POST /api/agents/analyze-email
+func (h *AgentHandler) AnalyzeEmail(c *gin.Context) {
+	var req EmailAnalysisReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "参数错误: "+err.Error())
+		return
+	}
+	provider := service.AIProvider(c.DefaultQuery("provider", ""))
+	analysis, run, err := h.agentSvc.AnalyzeEmail(req.Subject, req.Content, provider, models.TriggerUser)
+	if err != nil {
+		response.InternalError(c, "邮件分析失败: "+err.Error())
+		return
+	}
+	response.Success(c, gin.H{"analysis": analysis, "run": run})
+}
+
+// AnalyzeInquiry POST /api/agents/analyze-inquiry?inquiry_id=1
+func (h *AgentHandler) AnalyzeInquiry(c *gin.Context) {
+	inquiryID, err := strconv.ParseUint(c.Query("inquiry_id"), 10, 64)
+	if err != nil {
+		response.BadRequest(c, "inquiry_id 必填")
+		return
+	}
+	provider := service.AIProvider(c.DefaultQuery("provider", ""))
+	analysis, run, err := h.agentSvc.AnalyzeInquiry(uint(inquiryID), provider, models.TriggerUser)
+	if err != nil {
+		response.InternalError(c, "询盘分析失败: "+err.Error())
+		return
+	}
+	response.Success(c, gin.H{"analysis": analysis, "run": run})
+}
+
+// AdviseQuotation POST /api/agents/advise-quotation?inquiry_id=1&product_id=1
+func (h *AgentHandler) AdviseQuotation(c *gin.Context) {
+	inquiryID, err := strconv.ParseUint(c.Query("inquiry_id"), 10, 64)
+	if err != nil {
+		response.BadRequest(c, "inquiry_id 必填")
+		return
+	}
+	productID, err := strconv.ParseUint(c.Query("product_id"), 10, 64)
+	if err != nil {
+		response.BadRequest(c, "product_id 必填")
+		return
+	}
+	provider := service.AIProvider(c.DefaultQuery("provider", ""))
+	advice, run, err := h.agentSvc.AdviseQuotation(uint(inquiryID), uint(productID), provider, models.TriggerUser)
+	if err != nil {
+		response.InternalError(c, "报价建议失败: "+err.Error())
+		return
+	}
+	response.Success(c, gin.H{"advice": advice, "run": run})
+}
+
+// OptimizeListing POST /api/agents/optimize-listing?product_id=1&platform=amazon
+func (h *AgentHandler) OptimizeListing(c *gin.Context) {
+	productID, err := strconv.ParseUint(c.Query("product_id"), 10, 64)
+	if err != nil {
+		response.BadRequest(c, "product_id 必填")
+		return
+	}
+	platform := c.DefaultQuery("platform", "amazon")
+	provider := service.AIProvider(c.DefaultQuery("provider", ""))
+	opt, run, err := h.agentSvc.OptimizeListing(uint(productID), platform, provider, models.TriggerUser)
+	if err != nil {
+		response.InternalError(c, "上架优化失败: "+err.Error())
+		return
+	}
+	response.Success(c, gin.H{"optimization": opt, "run": run})
+}
+
+// ReviewsAnalysisReq 评论分析请求体。
+type ReviewsAnalysisReq struct {
+	Reviews string `json:"reviews" binding:"required"`
+}
+
+// AnalyzeReviews POST /api/agents/analyze-reviews
+func (h *AgentHandler) AnalyzeReviews(c *gin.Context) {
+	var req ReviewsAnalysisReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "参数错误: "+err.Error())
+		return
+	}
+	provider := service.AIProvider(c.DefaultQuery("provider", ""))
+	analysis, run, err := h.agentSvc.AnalyzeReviews(req.Reviews, provider, models.TriggerUser)
+	if err != nil {
+		response.InternalError(c, "评论分析失败: "+err.Error())
+		return
+	}
+	response.Success(c, gin.H{"analysis": analysis, "run": run})
+}

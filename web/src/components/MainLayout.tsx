@@ -60,7 +60,8 @@ const allMenuItems: AppMenuItem[] = [
       { key: "orders", label: "订单管理" },
     ],
   },
-  { key: "agents", icon: <RobotOutlined />, label: "AI Agent", roles: ["admin", "boss"] },
+  { key: "agents", icon: <RobotOutlined />, label: "Agent 任务中心", roles: ["admin", "boss"] },
+  { key: "agents-special", icon: <RobotOutlined />, label: "专用 Agent", roles: ["admin", "boss", "sales", "operator"] },
   { key: "cockpit", icon: <DashboardOutlined />, label: "老板驾驶舱", roles: ["admin", "boss"] },
   { key: "settings", icon: <SettingOutlined />, label: "系统设置", roles: ["admin"] },
 ];
