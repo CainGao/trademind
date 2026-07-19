@@ -88,6 +88,10 @@ func New(cfg *config.Config, db *gorm.DB) *gin.Engine {
 	agentSvc := service.NewAgentService(aiSvc, productRepo, supplierRepo, behaviorRepo, agentRepo)
 	schedSvc := service.NewSchedulerService(agentSvc, settingRepo)
 	b2cSvc := service.NewB2CService(storeRepo, listingRepo, orderRepo)
+	dailyReportSvc := service.NewDailyReportService(db, aiSvc, statsSvc, productRepo, supplierRepo, behaviorRepo, settingRepo)
+
+	// 把日报服务注入调度器（每天 18:00 触发）
+	schedSvc.SetDailyReportService(dailyReportSvc)
 	customerSvc := service.NewCustomerService(customerRepo)
 	inquirySvc := service.NewInquiryService(inquiryRepo)
 	quotationSvc := service.NewQuotationService(quotationRepo)
@@ -103,6 +107,7 @@ func New(cfg *config.Config, db *gorm.DB) *gin.Engine {
 	b2bHandler := handler.NewB2BHandler(customerSvc, inquirySvc, quotationSvc)
 	agentHandler := handler.NewAgentHandler(agentSvc, schedSvc)
 	b2cHandler := handler.NewB2CHandler(b2cSvc)
+	dailyReportHandler := handler.NewDailyReportHandler(dailyReportSvc)
 
 	// 启动 Agent 定时调度器（选品/采购 Agent，默认每天 9:00 / 10:00）
 	// 即使没有配置 AI Key 也启动——任务会失败但记录到 agent_runs，老板能在前端看到。
@@ -186,6 +191,16 @@ func New(cfg *config.Config, db *gorm.DB) *gin.Engine {
 		b2c.POST("/orders", b2cHandler.CreateOrder)
 		b2c.PUT("/orders/:id/status", b2cHandler.UpdateOrderStatus)
 		b2c.GET("/overview", b2cHandler.Overview)
+
+		// 老板日报 + 飞书 webhook 推送
+		dr := protected.Group("/daily-reports")
+		dr.POST("/generate", dailyReportHandler.Generate)
+		dr.GET("", dailyReportHandler.List)
+		dr.GET("/today", dailyReportHandler.GetToday)
+		dr.GET("/feishu-config", dailyReportHandler.GetFeishuConfig)
+		dr.PUT("/feishu-config", dailyReportHandler.UpdateFeishuConfig)
+		dr.GET("/:id", dailyReportHandler.GetByID)
+		dr.POST("/:id/deliver-feishu", dailyReportHandler.DeliverToFeishu)
 
 		// Chrome 插件对接（采集 / 行为 / 状态）
 		extensionHandler.RegisterRoutes(protected)

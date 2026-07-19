@@ -17,6 +17,7 @@ import {
   FundOutlined,
   LogoutOutlined,
   DownOutlined,
+  FileTextOutlined,
 } from "@ant-design/icons";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { useAuthStore } from "../store/auth";
@@ -62,6 +63,7 @@ const allMenuItems: AppMenuItem[] = [
   },
   { key: "agents", icon: <RobotOutlined />, label: "Agent 任务中心", roles: ["admin", "boss"] },
   { key: "agents-special", icon: <RobotOutlined />, label: "专用 Agent", roles: ["admin", "boss", "sales", "operator"] },
+  { key: "daily-reports", icon: <FileTextOutlined />, label: "老板日报", roles: ["admin", "boss"] },
   { key: "cockpit", icon: <DashboardOutlined />, label: "老板驾驶舱", roles: ["admin", "boss"] },
   { key: "settings", icon: <SettingOutlined />, label: "系统设置", roles: ["admin"] },
 ];

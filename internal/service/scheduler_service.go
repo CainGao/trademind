@@ -22,11 +22,12 @@ import (
 
 // SchedulerService 定时调度器。
 type SchedulerService struct {
-	mu        sync.Mutex
-	cron      *cron.Cron
-	agentSvc  *AgentService
-	setting   *repository.SettingRepo
-	schedule  map[models.AgentType]string // 当前生效的 cron 表达式
+	mu             sync.Mutex
+	cron           *cron.Cron
+	agentSvc       *AgentService
+	setting        *repository.SettingRepo
+	schedule       map[models.AgentType]string // 当前生效的 cron 表达式
+	dailyReportSvc *DailyReportService         // 日报服务（可选，延迟注入）
 }
 
 // NewSchedulerService 构造（不立即启动）。
@@ -36,6 +37,11 @@ func NewSchedulerService(agentSvc *AgentService, setting *repository.SettingRepo
 		setting:  setting,
 		schedule: map[models.AgentType]string{},
 	}
+}
+
+// SetDailyReportService 延迟注入日报服务（避免 router 装配循环依赖）。
+func (s *SchedulerService) SetDailyReportService(svc *DailyReportService) {
+	s.dailyReportSvc = svc
 }
 
 // DefaultSchedule 默认定时（settings 表无值时用）。
@@ -114,6 +120,27 @@ func (s *SchedulerService) Start() error {
 	// 注册采购 Agent
 	if err := s.register(models.AgentSourcing); err != nil {
 		return err
+	}
+
+	// 注册日报任务（每天 18:00），仅当注入了 dailyReportSvc
+	if s.dailyReportSvc != nil {
+		if _, err := s.cron.AddFunc("0 18 * * *", func() {
+			log.Println("[scheduler] 触发日报生成")
+			report, err := s.dailyReportSvc.Generate("", models.TriggerCron)
+			if err != nil {
+				log.Printf("[scheduler] 日报生成失败: %v", err)
+				return
+			}
+			// 自动推送（如已配置 webhook）
+			if err := s.dailyReportSvc.DeliverToFeishu(report.ID); err != nil {
+				log.Printf("[scheduler] 日报飞书推送跳过: %v", err)
+			} else {
+				log.Printf("[scheduler] 日报 #%d 已推送到飞书", report.ID)
+			}
+		}); err != nil {
+			return fmt.Errorf("注册日报任务失败: %w", err)
+		}
+		log.Println("[scheduler] 已注册 report | cron=0 18 * * * (每天 18:00)")
 	}
 
 	s.cron.Start()
