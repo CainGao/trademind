@@ -66,14 +66,21 @@ func New(cfg *config.Config, db *gorm.DB) *gin.Engine {
 	auditRepo := repository.NewAuditLogRepo(db)
 	companyRepo := repository.NewCompanyRepo(db)
 	settingRepo := repository.NewSettingRepo(db)
+	productRepo := repository.NewProductRepo(db)
+	supplierRepo := repository.NewSupplierRepo(db)
+	behaviorRepo := repository.NewBehaviorRepo(db)
 
 	// Service
 	authSvc := service.NewAuthService(userRepo, auditRepo, jwtMgr)
 	setupSvc := service.NewSetupService(companyRepo, settingRepo, userRepo, encryptor)
+	productSvc := service.NewProductService(productRepo)
+	extensionSvc := service.NewExtensionService(productRepo, supplierRepo, behaviorRepo)
 
 	// Handler
 	authHandler := handler.NewAuthHandler(authSvc)
 	setupHandler := handler.NewSetupHandler(setupSvc)
+	productHandler := handler.NewProductHandler(productSvc)
+	extensionHandler := handler.NewExtensionHandler(extensionSvc)
 
 	// ===== 健康检查（公开）=====
 	r.GET("/health", func(c *gin.Context) {
@@ -105,7 +112,11 @@ func New(cfg *config.Config, db *gorm.DB) *gin.Engine {
 		// 当前用户
 		protected.GET("/me", authHandler.Me)
 
-		// TODO: 业务模块路由
+		// 商品中心（CRUD）
+		productHandler.RegisterRoutes(protected)
+
+		// Chrome 插件对接（采集 / 行为 / 状态）
+		extensionHandler.RegisterRoutes(protected)
 	}
 
 	return r

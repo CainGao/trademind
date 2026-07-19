@@ -20,6 +20,7 @@ import LoginPage from "./pages/login/LoginPage";
 import SetupPage from "./pages/setup/SetupPage";
 import MainLayout from "./components/MainLayout";
 import DashboardPage from "./pages/dashboard/DashboardPage";
+import ProductList from "./pages/products/ProductList";
 import Placeholder from "./components/Placeholder";
 import { RobotOutlined } from "@ant-design/icons";
 
@@ -80,7 +81,7 @@ export default function App() {
             >
               <Route index element={<Navigate to="/dashboard" replace />} />
               <Route path="dashboard" element={<DashboardPage />} />
-              <Route path="products" element={<Placeholder title="商品中心" />} />
+              <Route path="products" element={<ProductList />} />
               <Route path="suppliers" element={<Placeholder title="供应商" />} />
               <Route path="customers" element={<Placeholder title="客户管理（B2B）" />} />
               <Route path="inquiries" element={<Placeholder title="询盘管理（B2B）" />} />

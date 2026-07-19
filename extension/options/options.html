@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>TradeMind 采集助手 — 设置</title>
+  <link rel="stylesheet" href="options.css" />
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>⚙️ TradeMind 采集助手设置</h1>
+      <p class="subtitle">配置数据上传目标和采集行为</p>
+    </header>
+
+    <!-- 连接状态 -->
+    <div id="connection-status" class="status-bar unknown">
+      <span class="dot"></span>
+      <span class="text">检查中…</span>
+    </div>
+
+    <section class="card">
+      <h2>🖥️ 服务端地址（上传目标）</h2>
+      <p class="hint">填入 TradeMind 服务端地址。本机部署默认 <code>http://localhost:7789</code>，也可填局域网/远程服务器地址。</p>
+      <div class="input-row">
+        <input type="text" id="serverUrl" placeholder="http://localhost:7789" />
+        <button id="testConn" class="btn-secondary">测试连接</button>
+      </div>
+      <div id="conn-result" class="result-line"></div>
+    </section>
+
+    <section class="card">
+      <h2>🔑 登录凭据</h2>
+      <p class="hint">使用 TradeMind 后台账号登录，采集的数据归属到此用户。</p>
+      <div class="grid-2">
+        <label>用户名<input type="text" id="username" placeholder="admin" /></label>
+        <label>密码<input type="password" id="password" placeholder="••••••" /></label>
+      </div>
+      <button id="testLogin" class="btn-secondary">登录测试</button>
+      <div id="login-result" class="result-line"></div>
+    </section>
+
+    <section class="card">
+      <h2>📦 采集设置</h2>
+      <label class="switch-row">
+        <input type="checkbox" id="autoCollect" />
+        <span>进入商品页自动采集</span>
+        <span class="hint-inline">（关闭后只能手动右键采集）</span>
+      </label>
+      <label class="switch-row">
+        <input type="checkbox" id="autoReportBehavior" />
+        <span>自动采集浏览行为</span>
+        <span class="hint-inline">（员工浏览记录沉淀为企业资产）</span>
+      </label>
+      <label class="input-label">
+        行为上报间隔（分钟）
+        <input type="number" id="reportIntervalMin" min="1" max="60" value="5" />
+      </label>
+    </section>
+
+    <div class="actions">
+      <button id="save" class="btn-primary">💾 保存设置</button>
+      <span id="save-result" class="result-line"></span>
+    </div>
+
+    <footer>
+      <p>TradeMind AI 采集助手 v3.0 · 数据完全私有化</p>
+    </footer>
+  </div>
+  <script type="module" src="options.js"></script>
+</body>
+</html>

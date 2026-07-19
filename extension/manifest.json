@@ -1,0 +1,50 @@
+{
+  "manifest_version": 3,
+  "name": "TradeMind AI 采集助手",
+  "version": "3.0.0",
+  "description": "采集 1688/阿里巴巴/亚马逊商品到 TradeMind 本地服务，行为数据自动沉淀为企业资产。",
+  "minimum_chrome_version": "114",
+  "permissions": [
+    "activeTab",
+    "storage",
+    "scripting",
+    "contextMenus",
+    "notifications"
+  ],
+  "host_permissions": [
+    "http://localhost/*",
+    "http://127.0.0.1/*",
+    "http://*/*",
+    "https://*/*"
+  ],
+  "background": {
+    "service_worker": "background/service-worker.js",
+    "type": "module"
+  },
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_title": "TradeMind 采集助手"
+  },
+  "options_page": "options/options.html",
+  "content_scripts": [
+    {
+      "matches": [
+        "*://detail.1688.com/*",
+        "*://*.1688.com/*",
+        "*://*.alibaba.com/*",
+        "*://www.alibaba.com/*",
+        "*://www.amazon.com/*",
+        "*://www.amazon.cn/*",
+        "*://*.amazonaws.com/*"
+      ],
+      "js": ["content/collector.js"],
+      "run_at": "document_idle",
+      "all_frames": false
+    }
+  ],
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}

@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>TradeMind</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <div class="popup">
+    <header>
+      <span class="logo">🧠 TradeMind</span>
+      <span id="status-badge" class="badge offline">未连接</span>
+    </header>
+
+    <!-- 当前页信息 -->
+    <section class="page-info" id="page-info">
+      <div class="page-row">
+        <span class="label">当前页</span>
+        <span id="page-platform" class="value">检测中…</span>
+      </div>
+      <div id="page-detail" class="page-detail hidden">
+        <div class="page-name" id="page-name"></div>
+        <div class="page-meta">
+          <span id="page-price"></span>
+          <span id="page-supplier"></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- 操作按钮 -->
+    <div class="actions">
+      <button id="collect-btn" class="btn-collect" disabled>采集此商品</button>
+    </div>
+
+    <!-- 用户信息 -->
+    <section class="user-info" id="user-info">
+      <div class="user-row">
+        <span class="label">账号</span>
+        <span id="user-name" class="value">—</span>
+      </div>
+    </section>
+
+    <!-- 底部链接 -->
+    <footer>
+      <a href="#" id="open-options">⚙️ 设置</a>
+      <span class="sep">·</span>
+      <a href="#" id="open-server">打开 TradeMind 后台</a>
+    </footer>
+  </div>
+  <script type="module" src="popup.js"></script>
+</body>
+</html>

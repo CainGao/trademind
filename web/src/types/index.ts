@@ -59,6 +59,9 @@ export interface Product {
   source_id?: string;
   source_url?: string;
   image_urls?: string;
+  weight_kg?: number;
+  volume_cbm?: number;
+  package_spec?: string;
   b2b_moq?: number;
   b2b_fob_price?: number;
   b2c_platform?: string;
