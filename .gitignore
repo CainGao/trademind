@@ -1,0 +1,43 @@
+# Build artifacts
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+trademind
+trademind.exe
+cmd/trademind/trademind
+
+# Runtime data
+runtime/
+logs/
+*.log
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Go test
+*.test
+*.out
+coverage.txt
+
+# Frontend
+web/node_modules/
+web/dist/
+web/.vite/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Environment
+.env
+.env.local
+*.pem
+
+# OS
+Thumbs.db
