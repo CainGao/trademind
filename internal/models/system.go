@@ -7,14 +7,34 @@ import "time"
 type KnowledgeChunk struct {
 	BaseModel
 
-	SourceFile  string `gorm:"not null;size:300;index" json:"source_file"`
-	ChunkIndex  int    `gorm:"not null" json:"chunk_index"`
-	Content     string `gorm:"not null;type:text" json:"content"`
-	Embedding   string `gorm:"type:text" json:"-"` // JSON array（sqlite-vec 或手写余弦相似度）
-	Metadata    string `gorm:"type:text" json:"metadata"` // JSON: {page, section, ...}
+	FileID     uint   `gorm:"not null;index" json:"file_id"`
+	SourceFile string `gorm:"not null;size:300;index" json:"source_file"` // 冗余存文件名，删除文件后仍可追溯
+	ChunkIndex int    `gorm:"not null" json:"chunk_index"`
+	Content    string `gorm:"not null;type:text" json:"content"`
+	Embedding  string `gorm:"type:text" json:"-"`                      // JSON array（纯 Go 余弦相似度）
+	Metadata   string `gorm:"type:text" json:"metadata"`               // JSON: {section, char_start, ...}
 }
 
-// File 上传文件管理。
+// KnowledgeFile 知识库文件（Week 8 RAG）。记录上传/粘贴的文档元数据 + 解析状态。
+// TableName 指定表名 knowledge_files，区别于通用 files（为未来其他文件用途留扩展空间）。
+type KnowledgeFile struct {
+	BaseModel
+	CreatedByMixin
+
+	Title      string     `gorm:"not null;size:300" json:"title"`        // 显示标题（粘贴文本时可自定义）
+	Filename   string     `gorm:"not null;size:300" json:"filename"`     // 原始文件名
+	FileType   string     `gorm:"size:20;index" json:"file_type"`        // txt|md|csv|docx|paste
+	FileSize   int64      `json:"file_size"`                             // 字节数（粘贴文本按字符数估算）
+	StoredPath string     `gorm:"type:text" json:"stored_path"`          // runtime/files/ 下的相对路径；粘贴文本为空
+	ChunkCount int        `gorm:"default:0" json:"chunk_count"`          // 生成的切片数
+	Status     FileStatus `gorm:"size:20;default:processing;index" json:"status"` // processing|ready|failed
+	ParseError string     `gorm:"type:text" json:"parse_error,omitempty"`
+}
+
+// TableName 指定表名。
+func (KnowledgeFile) TableName() string { return "knowledge_files" }
+
+// File 上传文件管理（通用，保留兼容）。
 type File struct {
 	BaseModel
 	CreatedByMixin

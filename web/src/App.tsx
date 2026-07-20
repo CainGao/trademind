@@ -29,6 +29,7 @@ import SpecialAgents from "./pages/agents/SpecialAgents";
 import DailyReports from "./pages/reports/DailyReports";
 import StoreList from "./pages/stores/StoreList";
 import OrderList from "./pages/orders/OrderList";
+import Knowledge from "./pages/knowledge/Knowledge";
 import Placeholder from "./components/Placeholder";
 
 // 需登录的路由守卫
@@ -99,6 +100,7 @@ export default function App() {
               <Route path="agents" element={<AgentList />} />
               <Route path="agents-special" element={<SpecialAgents />} />
               <Route path="daily-reports" element={<DailyReports />} />
+              <Route path="knowledge" element={<Knowledge />} />
               <Route path="cockpit" element={<Cockpit />} />
               <Route path="settings" element={<Placeholder title="系统设置" />} />
               <Route path="*" element={<Navigate to="/dashboard" replace />} />

@@ -127,6 +127,17 @@ const (
 	OrderRefunded  OrderStatus = "refunded"
 )
 
+// ===== 知识库（RAG）=====
+
+// FileStatus 知识库文件解析状态
+type FileStatus string
+
+const (
+	FileStatusProcessing FileStatus = "processing" // 解析+向量化中
+	FileStatusReady      FileStatus = "ready"      // 可检索
+	FileStatusFailed     FileStatus = "failed"     // 解析失败
+)
+
 // ===== 通用 =====
 
 // ModuleName 模块包名

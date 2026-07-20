@@ -63,6 +63,7 @@ func AllModels() []interface{} {
 		&models.AgentRun{},
 		&models.DailyReport{},
 		&models.KnowledgeChunk{},
+		&models.KnowledgeFile{},
 		&models.File{},
 		&models.Setting{},
 		&models.AgentPrompt{},

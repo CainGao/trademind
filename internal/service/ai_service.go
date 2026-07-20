@@ -279,3 +279,124 @@ func (s *AIService) ConfiguredProviders() []ProviderInfo {
 	}
 	return result
 }
+
+// ============================================================================
+// Embedding（Week 8 RAG）
+//
+// OpenAI 兼容的 /v1/embeddings 协议。OpenAI 和 Qwen(DashScope 兼容模式)均原生支持。
+// DeepSeek / Anthropic 无 Embedding API —— 按优先级 openai > qwen 找第一个有 Key 的。
+// ============================================================================
+
+// 支持嵌入的厂商及其端点。
+var providerEmbeddingEndpoint = map[AIProvider]string{
+	ProviderOpenAI: "https://api.openai.com/v1/embeddings",
+	ProviderQwen:   "https://dashscope.aliyuncs.com/compatible-mode/v1/embeddings",
+}
+
+// 各厂商默认嵌入模型。
+var providerEmbeddingModel = map[AIProvider]string{
+	ProviderOpenAI: "text-embedding-3-small", // 1536 维，便宜
+	ProviderQwen:   "text-embedding-v2",      // 1536 维
+}
+
+// EmbeddingResponse 嵌入结果。
+type EmbeddingResponse struct {
+	Provider AIProvider `json:"provider"`
+	Model    string     `json:"model"`
+	Vectors  [][]float64 `json:"vectors"` // 与输入文本一一对应
+	Dims     int        `json:"dims"`     // 向量维度
+}
+
+// Embed 批量生成文本的嵌入向量。
+// 优先级：指定 provider > openai > qwen（DeepSeek/Anthropic 无 embedding API）。
+func (s *AIService) Embed(texts []string, specified AIProvider) (*EmbeddingResponse, error) {
+	if len(texts) == 0 {
+		return nil, errors.New("嵌入文本不能为空")
+	}
+
+	// 选支持 embedding 的 provider
+	provider, apiKey, model, err := s.resolveEmbeddingProvider(specified)
+	if err != nil {
+		return nil, err
+	}
+
+	// 构造 OpenAI 兼容请求
+	body := map[string]interface{}{
+		"model": model,
+		"input": texts,
+	}
+	bodyBytes, _ := json.Marshal(body)
+
+	url := providerEmbeddingEndpoint[provider]
+	httpReq, _ := http.NewRequest("POST", url, bytes.NewReader(bodyBytes))
+	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("Authorization", "Bearer "+apiKey)
+
+	resp, err := s.httpClient.Do(httpReq)
+	if err != nil {
+		return nil, fmt.Errorf("调用 %s 嵌入失败: %w", provider, err)
+	}
+	defer resp.Body.Close()
+
+	respBytes, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusOK {
+		errMsg := string(respBytes)
+		if len(errMsg) > 500 {
+			errMsg = errMsg[:500]
+		}
+		return nil, fmt.Errorf("%s 嵌入返回 %d: %s", provider, resp.StatusCode, errMsg)
+	}
+
+	// 解析 OpenAI 协议嵌入响应
+	var raw struct {
+		Data []struct {
+			Embedding []float64 `json:"embedding"`
+			Index     int       `json:"index"`
+		} `json:"data"`
+		Model string `json:"model"`
+	}
+	if err := json.Unmarshal(respBytes, &raw); err != nil {
+		return nil, fmt.Errorf("解析嵌入响应失败: %w", err)
+	}
+	if len(raw.Data) == 0 {
+		return nil, errors.New("嵌入返回空数据")
+	}
+
+	// 按 index 排序（OpenAI 规范保证顺序，但保险起见）
+	vectors := make([][]float64, len(raw.Data))
+	for _, d := range raw.Data {
+		if d.Index >= 0 && d.Index < len(vectors) {
+			vectors[d.Index] = d.Embedding
+		}
+	}
+
+	return &EmbeddingResponse{
+		Provider: provider,
+		Model:    raw.Model,
+		Vectors:  vectors,
+		Dims:     len(vectors[0]),
+	}, nil
+}
+
+// resolveEmbeddingProvider 选支持 embedding 的 provider（DeepSeek/Anthropic 跳过）。
+func (s *AIService) resolveEmbeddingProvider(specified AIProvider) (AIProvider, string, string, error) {
+	// 候选顺序：指定 > openai > qwen
+	candidates := []AIProvider{}
+	if specified != "" {
+		candidates = append(candidates, specified)
+	}
+	candidates = append(candidates, ProviderOpenAI, ProviderQwen)
+
+	seen := map[AIProvider]bool{}
+	for _, p := range candidates {
+		if seen[p] || providerEmbeddingEndpoint[p] == "" {
+			continue
+		}
+		seen[p] = true
+		key := s.getDecryptedKey(p)
+		if key != "" {
+			return p, key, providerEmbeddingModel[p], nil
+		}
+	}
+	return "", "", "", errors.New("无可用的嵌入模型（需配置 OpenAI 或 Qwen 的 AI Key；DeepSeek/Anthropic 不支持嵌入）")
+}

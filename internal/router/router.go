@@ -9,6 +9,8 @@
 package router
 
 import (
+	"path/filepath"
+
 	"github.com/CainGao/trademind/internal/config"
 	"github.com/CainGao/trademind/internal/database"
 	"github.com/CainGao/trademind/internal/handler"
@@ -76,6 +78,8 @@ func New(cfg *config.Config, db *gorm.DB) *gin.Engine {
 	listingRepo := repository.NewListingRepo(db)
 	orderRepo := repository.NewOrderRepo(db)
 	agentRepo := repository.NewAgentRepo(db)
+	fileRepo := repository.NewFileRepo(db)
+	knowledgeRepo := repository.NewKnowledgeRepo(db)
 
 	// Service
 	authSvc := service.NewAuthService(userRepo, auditRepo, jwtMgr)
@@ -95,6 +99,9 @@ func New(cfg *config.Config, db *gorm.DB) *gin.Engine {
 	customerSvc := service.NewCustomerService(customerRepo)
 	inquirySvc := service.NewInquiryService(inquiryRepo)
 	quotationSvc := service.NewQuotationService(quotationRepo)
+	// 知识库 RAG（Week 8）：上传文件存 runtime/files/
+	filesDir := filepath.Join(cfg.App.RuntimeDir, "files")
+	knowledgeSvc := service.NewKnowledgeService(fileRepo, knowledgeRepo, aiSvc, filesDir)
 
 	// Handler
 	authHandler := handler.NewAuthHandler(authSvc)
@@ -108,6 +115,7 @@ func New(cfg *config.Config, db *gorm.DB) *gin.Engine {
 	agentHandler := handler.NewAgentHandler(agentSvc, schedSvc)
 	b2cHandler := handler.NewB2CHandler(b2cSvc)
 	dailyReportHandler := handler.NewDailyReportHandler(dailyReportSvc)
+	knowledgeHandler := handler.NewKnowledgeHandler(knowledgeSvc)
 
 	// 启动 Agent 定时调度器（选品/采购 Agent，默认每天 9:00 / 10:00）
 	// 即使没有配置 AI Key 也启动——任务会失败但记录到 agent_runs，老板能在前端看到。
@@ -201,6 +209,9 @@ func New(cfg *config.Config, db *gorm.DB) *gin.Engine {
 		dr.PUT("/feishu-config", dailyReportHandler.UpdateFeishuConfig)
 		dr.GET("/:id", dailyReportHandler.GetByID)
 		dr.POST("/:id/deliver-feishu", dailyReportHandler.DeliverToFeishu)
+
+		// RAG 知识库（Week 8）：上传/检索/对话
+		knowledgeHandler.RegisterRoutes(protected)
 
 		// Chrome 插件对接（采集 / 行为 / 状态）
 		extensionHandler.RegisterRoutes(protected)
