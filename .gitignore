@@ -8,6 +8,12 @@ trademind
 trademind_test
 trademind.exe
 cmd/trademind/trademind
+# Build directory binaries (keep scripts: .nsi, .plist, .md)
+build/*/trademind
+build/*/trademind.exe
+build/*/TradeMind.app/
+build/macos/TradeMind-*.dmg
+build/windows/TradeMind-Setup-*.exe
 
 # Runtime data
 runtime/
