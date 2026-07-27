@@ -58,6 +58,11 @@ func NotFound(c *gin.Context, msg string) {
 	c.JSON(404, Response{Code: 1002, Message: msg})
 }
 
+// Conflict 资源冲突（HTTP 409）—— 用户名重复、唯一约束冲突等。
+func Conflict(c *gin.Context, msg string) {
+	c.JSON(409, Response{Code: 1001, Message: msg})
+}
+
 // InternalError 内部错误（HTTP 500）。
 func InternalError(c *gin.Context, msg string) {
 	c.JSON(500, Response{Code: 5000, Message: msg})

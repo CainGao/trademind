@@ -30,6 +30,7 @@ import DailyReports from "./pages/reports/DailyReports";
 import StoreList from "./pages/stores/StoreList";
 import OrderList from "./pages/orders/OrderList";
 import Knowledge from "./pages/knowledge/Knowledge";
+import SettingsPage from "./pages/system/SettingsPage";
 import Placeholder from "./components/Placeholder";
 
 // 需登录的路由守卫
@@ -102,7 +103,7 @@ export default function App() {
               <Route path="daily-reports" element={<DailyReports />} />
               <Route path="knowledge" element={<Knowledge />} />
               <Route path="cockpit" element={<Cockpit />} />
-              <Route path="settings" element={<Placeholder title="系统设置" />} />
+              <Route path="settings" element={<SettingsPage />} />
               <Route path="*" element={<Navigate to="/dashboard" replace />} />
             </Route>
           </Routes>

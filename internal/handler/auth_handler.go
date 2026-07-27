@@ -72,7 +72,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 	user, err := h.svc.Register(input)
 	if err != nil {
 		if errors.Is(err, service.ErrUsernameTaken) {
-			response.BadRequest(c, err.Error()) // TODO: 改 409 Conflict
+			response.Conflict(c, err.Error())
 			return
 		}
 		response.InternalError(c, "注册失败")

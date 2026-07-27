@@ -11,6 +11,7 @@ cmd/trademind/trademind
 # Build directory binaries (keep scripts: .nsi, .plist, .md)
 build/*/trademind
 build/*/trademind.exe
+build/*/trademind-arm64
 build/*/TradeMind.app/
 build/macos/TradeMind-*.dmg
 build/windows/TradeMind-Setup-*.exe

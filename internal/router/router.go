@@ -15,6 +15,7 @@ import (
 	"github.com/CainGao/trademind/internal/database"
 	"github.com/CainGao/trademind/internal/handler"
 	"github.com/CainGao/trademind/internal/middleware"
+	"github.com/CainGao/trademind/internal/models"
 	"github.com/CainGao/trademind/internal/pkg/crypto"
 	"github.com/CainGao/trademind/internal/repository"
 	"github.com/CainGao/trademind/internal/service"
@@ -102,6 +103,9 @@ func New(cfg *config.Config, db *gorm.DB) *gin.Engine {
 	// 知识库 RAG（Week 8）：上传文件存 runtime/files/
 	filesDir := filepath.Join(cfg.App.RuntimeDir, "files")
 	knowledgeSvc := service.NewKnowledgeService(fileRepo, knowledgeRepo, aiSvc, filesDir)
+	// 数据备份/恢复（数据安全）：备份存 runtime/backups/
+	backupsDir := filepath.Join(cfg.App.RuntimeDir, "backups")
+	backupSvc := service.NewBackupService(db, backupsDir, filesDir, cfg.App.Version)
 
 	// Handler
 	authHandler := handler.NewAuthHandler(authSvc)
@@ -116,6 +120,7 @@ func New(cfg *config.Config, db *gorm.DB) *gin.Engine {
 	b2cHandler := handler.NewB2CHandler(b2cSvc)
 	dailyReportHandler := handler.NewDailyReportHandler(dailyReportSvc)
 	knowledgeHandler := handler.NewKnowledgeHandler(knowledgeSvc)
+	backupHandler := handler.NewBackupHandler(backupSvc)
 
 	// 启动 Agent 定时调度器（选品/采购 Agent，默认每天 9:00 / 10:00）
 	// 即使没有配置 AI Key 也启动——任务会失败但记录到 agent_runs，老板能在前端看到。
@@ -212,6 +217,11 @@ func New(cfg *config.Config, db *gorm.DB) *gin.Engine {
 
 		// RAG 知识库（Week 8）：上传/检索/对话
 		knowledgeHandler.RegisterRoutes(protected)
+
+		// 数据备份（管理员）：生成/列表/下载/删除
+		backupAdmin := protected.Group("")
+		backupAdmin.Use(middleware.RequireRole(models.RoleAdmin))
+		backupHandler.RegisterRoutes(backupAdmin)
 
 		// Chrome 插件对接（采集 / 行为 / 状态）
 		extensionHandler.RegisterRoutes(protected)
