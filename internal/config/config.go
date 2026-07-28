@@ -10,6 +10,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"gopkg.in/yaml.v3"
 )
 
 // Config 应用配置。
@@ -60,13 +62,25 @@ func Default() *Config {
 }
 
 // Load 加载配置。优先级: 环境变量 > runtime/config.yaml > 默认。
+// 向后兼容包装：LoadFromPath("")。
 func Load() (*Config, error) {
+	return LoadFromPath("")
+}
+
+// LoadFromPath 从指定路径加载 YAML 配置（空路径则读 runtime/config.yaml）。
+// 优先级: 环境变量 > config.yaml > 默认值。
+func LoadFromPath(customPath string) (*Config, error) {
 	cfg := Default()
 
-	// 读 runtime/config.yaml（如果存在）
-	userCfgPath := filepath.Join("runtime", "config.yaml")
-	if data, err := os.ReadFile(userCfgPath); err == nil {
-		_ = data // TODO: YAML 解析（简化版先用默认）
+	// 读 YAML 配置文件（如果存在），解析后覆盖默认值
+	cfgPath := customPath
+	if cfgPath == "" {
+		cfgPath = filepath.Join("runtime", "config.yaml")
+	}
+	if data, err := os.ReadFile(cfgPath); err == nil {
+		if err := yaml.Unmarshal(data, cfg); err != nil {
+			return nil, fmt.Errorf("解析配置文件失败 [%s]: %w", cfgPath, err)
+		}
 	}
 
 	// 环境变量覆盖

@@ -26,7 +26,8 @@ import (
 
 // New 创建 Gin 引擎并注册全部路由。
 // 所有依赖（Repo/Service/Handler）在此装配（简易 DI）。
-func New(cfg *config.Config, db *gorm.DB) *gin.Engine {
+// 返回 (engine, scheduler) — scheduler 供 main 做优雅关闭。
+func New(cfg *config.Config, db *gorm.DB) (*gin.Engine, *service.SchedulerService) {
 	if cfg.App.Production {
 		gin.SetMode(gin.ReleaseMode)
 	}
@@ -34,6 +35,9 @@ func New(cfg *config.Config, db *gorm.DB) *gin.Engine {
 	r := gin.New()
 	r.Use(gin.Logger())
 	r.Use(gin.Recovery())
+
+	// 私有化部署仅本机访问，关闭 trusted proxies 以消除 Gin 安全警告
+	_ = r.SetTrustedProxies(nil)
 
 	// CORS（规范 §6.5: 仅 localhost）
 	r.Use(cors.New(cors.Config{
@@ -227,5 +231,5 @@ func New(cfg *config.Config, db *gorm.DB) *gin.Engine {
 		extensionHandler.RegisterRoutes(protected)
 	}
 
-	return r
+	return r, schedSvc
 }

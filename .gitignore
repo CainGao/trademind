@@ -4,7 +4,7 @@
 *.dll
 *.so
 *.dylib
-trademind
+/trademind
 trademind_test
 trademind.exe
 cmd/trademind/trademind

@@ -96,3 +96,63 @@ func TestLoad_CreatesDirectories(t *testing.T) {
 		t.Error("Load should create logs/ directory")
 	}
 }
+
+func TestLoadFromPath_YAMLOverride(t *testing.T) {
+	// Write a temp YAML config
+	tmpDir := t.TempDir()
+	cfgFile := tmpDir + "/test-config.yaml"
+	yamlContent := []byte("server:\n  port: 8899\ndatabase:\n  path: ./test-data.db\n")
+	if err := os.WriteFile(cfgFile, yamlContent, 0644); err != nil {
+		t.Fatalf("write temp config: %v", err)
+	}
+	defer os.RemoveAll(tmpDir + "/test-data.db")
+
+	os.Unsetenv("TRADEMIND_PORT")
+	os.Unsetenv("TRADEMIND_DB_PATH")
+
+	cfg, err := LoadFromPath(cfgFile)
+	if err != nil {
+		t.Fatalf("LoadFromPath() error: %v", err)
+	}
+	if cfg.Server.Port != 8899 {
+		t.Errorf("YAML override port = %d, want 8899", cfg.Server.Port)
+	}
+	if cfg.Database.Path != "./test-data.db" {
+		t.Errorf("YAML override db path = %q, want './test-data.db'", cfg.Database.Path)
+	}
+}
+
+func TestLoadFromPath_NonExistentFile(t *testing.T) {
+	os.Unsetenv("TRADEMIND_PORT")
+	os.Unsetenv("TRADEMIND_DB_PATH")
+
+	// Non-existent path should fall back to defaults (no error)
+	cfg, err := LoadFromPath("/nonexistent/path/config.yaml")
+	if err != nil {
+		t.Fatalf("LoadFromPath() with non-existent file should not error: %v", err)
+	}
+	if cfg.Server.Port != 7789 {
+		t.Errorf("Default port = %d, want 7789", cfg.Server.Port)
+	}
+}
+
+func TestLoadFromPath_EnvOverridesYAML(t *testing.T) {
+	// Environment variables should take priority over YAML values
+	tmpDir := t.TempDir()
+	cfgFile := tmpDir + "/test-config.yaml"
+	yamlContent := []byte("server:\n  port: 8899\n")
+	if err := os.WriteFile(cfgFile, yamlContent, 0644); err != nil {
+		t.Fatalf("write temp config: %v", err)
+	}
+
+	os.Setenv("TRADEMIND_PORT", "7777")
+	defer os.Unsetenv("TRADEMIND_PORT")
+
+	cfg, err := LoadFromPath(cfgFile)
+	if err != nil {
+		t.Fatalf("LoadFromPath() error: %v", err)
+	}
+	if cfg.Server.Port != 7777 {
+		t.Errorf("Env should override YAML: port = %d, want 7777", cfg.Server.Port)
+	}
+}
