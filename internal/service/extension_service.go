@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/CainGao/trademind/internal/config"
 	"github.com/CainGao/trademind/internal/models"
 	"github.com/CainGao/trademind/internal/repository"
 	"github.com/shopspring/decimal"
@@ -271,7 +272,7 @@ func (s *ExtensionService) Status(userName, role string) ConnectionStatus {
 	return ConnectionStatus{
 		Connected: true,
 		Server:    "TradeMind",
-		Version:   "0.1.0",
+		Version:   config.AppVersion,
 		User:      userName,
 		Role:      role,
 	}

@@ -14,6 +14,9 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// AppVersion 可被 ldflags 覆盖（Makefile: -X 'config.AppVersion=1.0.0'）。
+var AppVersion = "0.1.0"
+
 // Config 应用配置。
 type Config struct {
 	Server   ServerConfig   `yaml:"server"`
@@ -55,7 +58,7 @@ func Default() *Config {
 			MaxSize: 50, MaxBackups: 7, MaxAge: 30,
 		},
 		App: AppConfig{
-			Name: "TradeMind AI", Version: "0.1.0",
+			Name: "TradeMind AI", Version: AppVersion,
 			RuntimeDir: "runtime", Production: false,
 		},
 	}

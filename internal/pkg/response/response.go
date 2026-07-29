@@ -3,7 +3,11 @@
 // 所有 Handler 必须用本包返回，禁止裸 c.JSON()。
 package response
 
-import "github.com/gin-gonic/gin"
+import (
+	"reflect"
+
+	"github.com/gin-gonic/gin"
+)
 
 // Response 统一响应结构。
 // Code=0 表示成功，非 0 表示错误码（规范 V1.0 §3.4）。
@@ -27,7 +31,14 @@ func Success(c *gin.Context, data interface{}) {
 }
 
 // SuccessPage 分页响应。
+// 自动将 nil 切片转为空数组，防止 JSON 输出 null（gotcha #45）。
 func SuccessPage(c *gin.Context, list interface{}, total int64, page, size int) {
+	if list != nil {
+		v := reflect.ValueOf(list)
+		if v.Kind() == reflect.Slice && v.IsNil() {
+			list = reflect.MakeSlice(v.Type(), 0, 0).Interface()
+		}
+	}
 	c.JSON(200, Response{Code: 0, Message: "success", Data: PageData{
 		List: list, Total: total, Page: page, Size: size,
 	}})

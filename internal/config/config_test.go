@@ -19,6 +19,9 @@ func TestDefault(t *testing.T) {
 	if cfg.App.Version == "" {
 		t.Error("Default version should not be empty")
 	}
+	if cfg.App.Version != AppVersion {
+		t.Errorf("Default version = %q, want AppVersion %q", cfg.App.Version, AppVersion)
+	}
 	if cfg.Database.Path == "" {
 		t.Error("Default DB path should not be empty")
 	}
