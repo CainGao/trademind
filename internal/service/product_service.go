@@ -53,10 +53,18 @@ func (s *ProductService) Create(in CreateProductInput) (*models.Product, error) 
 		Scenarios:        defaultIfEmpty(in.Scenarios, `["b2b","b2c"]`),
 	}
 	if in.PurchasePrice != "" {
-		p.PurchasePrice, _ = decimal.NewFromString(in.PurchasePrice)
+		v, err := decimal.NewFromString(in.PurchasePrice)
+		if err != nil {
+			return nil, errors.New("采购价格式无效：" + in.PurchasePrice)
+		}
+		p.PurchasePrice = v
 	}
 	if in.WeightKG != "" {
-		p.WeightKG, _ = decimal.NewFromString(in.WeightKG)
+		v, err := decimal.NewFromString(in.WeightKG)
+		if err != nil {
+			return nil, errors.New("重量格式无效：" + in.WeightKG)
+		}
+		p.WeightKG = v
 	}
 	p.CreatedBy = in.CreatedBy
 
@@ -101,7 +109,11 @@ func (s *ProductService) Update(id uint, in UpdateProductInput) (*models.Product
 		p.Description = *in.Description
 	}
 	if in.PurchasePrice != nil {
-		p.PurchasePrice, _ = decimal.NewFromString(*in.PurchasePrice)
+		v, err := decimal.NewFromString(*in.PurchasePrice)
+		if err != nil {
+			return nil, errors.New("采购价格式无效：" + *in.PurchasePrice)
+		}
+		p.PurchasePrice = v
 	}
 	if in.PurchaseCurrency != nil {
 		p.PurchaseCurrency = *in.PurchaseCurrency
@@ -113,7 +125,11 @@ func (s *ProductService) Update(id uint, in UpdateProductInput) (*models.Product
 		p.ImageURLs = *in.ImageURLs
 	}
 	if in.WeightKG != nil {
-		p.WeightKG, _ = decimal.NewFromString(*in.WeightKG)
+		v, err := decimal.NewFromString(*in.WeightKG)
+		if err != nil {
+			return nil, errors.New("重量格式无效：" + *in.WeightKG)
+		}
+		p.WeightKG = v
 	}
 	if in.PackageSpec != nil {
 		p.PackageSpec = *in.PackageSpec

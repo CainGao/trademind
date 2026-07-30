@@ -2,6 +2,7 @@
 package repository
 
 import (
+	"log"
 	"time"
 
 	"github.com/CainGao/trademind/internal/models"
@@ -19,7 +20,7 @@ func NewAuditLogRepo(db *gorm.DB) *AuditLogRepo {
 
 // Log 写入审计日志（异步友好：失败只影响日志，不阻断主流程）。
 func (r *AuditLogRepo) Log(userID uint, action, resource string, resourceID *uint, detail, ip string) {
-	log := models.AuditLog{
+	entry := models.AuditLog{
 		UserID:     userID,
 		Action:     action,
 		Resource:   resource,
@@ -28,9 +29,8 @@ func (r *AuditLogRepo) Log(userID uint, action, resource string, resourceID *uin
 		IP:         ip,
 	}
 	// 容错：失败仅打印不抛错
-	if err := r.DB.Create(&log).Error; err != nil {
-		// TODO: 接 logger 打 warn
-		_ = err
+	if err := r.DB.Create(&entry).Error; err != nil {
+		log.Printf("[audit] 写入审计日志失败 user_id=%d action=%s: %v", userID, action, err)
 	}
 }
 

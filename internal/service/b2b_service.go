@@ -142,7 +142,11 @@ func (s *InquiryService) Create(in CreateInquiryInput) (*models.Inquiry, error) 
 	}
 	var price decimal.Decimal
 	if in.TargetPrice != "" {
-		price, _ = decimal.NewFromString(in.TargetPrice)
+		v, err := decimal.NewFromString(in.TargetPrice)
+		if err != nil {
+			return nil, errors.New("目标价格式无效：" + in.TargetPrice)
+		}
+		price = v
 	}
 	i := &models.Inquiry{
 		CustomerID:  in.CustomerID,
@@ -206,7 +210,10 @@ func (s *QuotationService) Create(in CreateQuotationInput) (*models.Quotation, e
 	if in.Currency == "" {
 		in.Currency = "USD"
 	}
-	amount, _ := decimal.NewFromString(in.TotalAmount)
+	amount, err := decimal.NewFromString(in.TotalAmount)
+	if err != nil {
+		return nil, errors.New("报价总金额格式无效：" + in.TotalAmount)
+	}
 
 	q := &models.Quotation{
 		QuotationNo: "", // 由 repo 生成
@@ -257,7 +264,15 @@ type UpdateQuotationStatusInput struct {
 	Status string `json:"status"` // draft|sent|accepted|rejected|expired
 }
 
+// validQuotationStatuses 报价单允许的状态值。
+var validQuotationStatuses = map[string]bool{
+	"draft": true, "sent": true, "accepted": true, "rejected": true, "expired": true,
+}
+
 func (s *QuotationService) UpdateStatus(id uint, in UpdateQuotationStatusInput) error {
+	if !validQuotationStatuses[in.Status] {
+		return errors.New("无效的报价单状态：" + in.Status + "（允许: draft/sent/accepted/rejected/expired）")
+	}
 	q, err := s.repo.FindByID(id)
 	if err != nil {
 		return err
