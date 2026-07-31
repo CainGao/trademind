@@ -6,6 +6,8 @@
 package service
 
 import (
+	"errors"
+
 	"github.com/CainGao/trademind/internal/models"
 	"github.com/CainGao/trademind/internal/repository"
 )
@@ -78,8 +80,21 @@ func (s *B2CService) CreateOrder(o *models.Order) error {
 	return s.orderRepo.Create(o)
 }
 
+// validOrderStatuses B2C 订单允许的状态值。
+var validOrderStatuses = map[models.OrderStatus]bool{
+	models.OrderPending:   true,
+	models.OrderPaid:      true,
+	models.OrderShipped:   true,
+	models.OrderDelivered: true,
+	models.OrderCancelled: true,
+	models.OrderRefunded:  true,
+}
+
 // UpdateOrderStatus 更新订单状态。
 func (s *B2CService) UpdateOrderStatus(id uint, status models.OrderStatus) error {
+	if !validOrderStatuses[status] {
+		return errors.New("无效的订单状态：" + string(status) + "（允许: pending/paid/shipped/delivered/cancelled/refunded）")
+	}
 	o, err := s.orderRepo.FindByID(id)
 	if err != nil {
 		return err

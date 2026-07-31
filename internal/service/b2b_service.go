@@ -39,6 +39,9 @@ func (s *CustomerService) Create(in CreateCustomerInput) (*models.Customer, erro
 	}
 	stage := models.CustomerStageLead
 	if in.Stage != "" {
+		if !validCustomerStages[in.Stage] {
+			return nil, errors.New("无效的客户阶段：" + in.Stage + "（允许: lead/quoting/negotiating/won/lost）")
+		}
 		stage = models.CustomerStage(in.Stage)
 	}
 	c := &models.Customer{
@@ -100,7 +103,12 @@ func (s *CustomerService) Update(id uint, in UpdateCustomerInput) (*models.Custo
 	if in.Phone != nil { c.Phone = *in.Phone }
 	if in.WeChat != nil { c.WeChat = *in.WeChat }
 	if in.Demand != nil { c.Demand = *in.Demand }
-	if in.Stage != nil { c.Stage = models.CustomerStage(*in.Stage) }
+	if in.Stage != nil {
+		if !validCustomerStages[*in.Stage] {
+			return nil, errors.New("无效的客户阶段：" + *in.Stage + "（允许: lead/quoting/negotiating/won/lost）")
+		}
+		c.Stage = models.CustomerStage(*in.Stage)
+	}
 	if err := s.repo.Update(c); err != nil {
 		return nil, err
 	}
@@ -138,6 +146,9 @@ func (s *InquiryService) Create(in CreateInquiryInput) (*models.Inquiry, error) 
 	}
 	status := "new"
 	if in.Status != "" {
+		if !validInquiryStatuses[in.Status] {
+			return nil, errors.New("无效的询盘状态：" + in.Status + "（允许: new/quoting/quoted/won/lost）")
+		}
 		status = in.Status
 	}
 	var price decimal.Decimal
@@ -267,6 +278,16 @@ type UpdateQuotationStatusInput struct {
 // validQuotationStatuses 报价单允许的状态值。
 var validQuotationStatuses = map[string]bool{
 	"draft": true, "sent": true, "accepted": true, "rejected": true, "expired": true,
+}
+
+// validCustomerStages 客户允许的阶段值（规范 V1.0 §1.4 枚举白名单）。
+var validCustomerStages = map[string]bool{
+	"lead": true, "quoting": true, "negotiating": true, "won": true, "lost": true,
+}
+
+// validInquiryStatuses 询盘允许的状态值。
+var validInquiryStatuses = map[string]bool{
+	"new": true, "quoting": true, "quoted": true, "won": true, "lost": true,
 }
 
 func (s *QuotationService) UpdateStatus(id uint, in UpdateQuotationStatusInput) error {
