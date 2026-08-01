@@ -8,6 +8,7 @@
 //   - GET    /api/b2c/listings              上架列表
 //   - POST   /api/b2c/listings              创建上架
 //   - PUT    /api/b2c/listings/:id          更新上架
+//   - DELETE /api/b2c/listings/:id          删除上架
 //   - GET    /api/b2c/orders                订单列表
 //   - POST   /api/b2c/orders                创建订单（手动补录）
 //   - PUT    /api/b2c/orders/:id/status     更新订单状态
@@ -146,6 +147,20 @@ func (h *B2CHandler) UpdateListing(c *gin.Context) {
 		return
 	}
 	response.Success(c, l)
+}
+
+// DeleteListing DELETE /api/b2c/listings/:id
+func (h *B2CHandler) DeleteListing(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		response.BadRequest(c, "无效 ID")
+		return
+	}
+	if err := h.svc.DeleteListing(uint(id)); err != nil {
+		response.InternalError(c, "删除失败: "+err.Error())
+		return
+	}
+	response.Success(c, gin.H{"deleted": true})
 }
 
 // ========== 订单 ==========

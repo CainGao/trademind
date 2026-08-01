@@ -24,6 +24,29 @@ func NewB2CService(store *repository.StoreRepo, listing *repository.ListingRepo,
 	return &B2CService{storeRepo: store, listingRepo: listing, orderRepo: order}
 }
 
+// validStorePlatforms B2C 店铺允许的平台值。
+var validStorePlatforms = map[string]bool{
+	"amazon":  true,
+	"shopify": true,
+	"tiktok":  true,
+	"temu":    true,
+}
+
+// validStoreStatuses B2C 店铺允许的状态值。
+var validStoreStatuses = map[string]bool{
+	"active":  true,
+	"expired": true,
+	"revoked": true,
+}
+
+// validListingStatuses B2C 上架允许的状态值。
+var validListingStatuses = map[string]bool{
+	"draft":  true,
+	"active": true,
+	"paused": true,
+	"closed": true,
+}
+
 // ========== 店铺 ==========
 
 // ListStores 店铺列表。
@@ -33,11 +56,23 @@ func (s *B2CService) ListStores(page, pageSize int, platform string) ([]models.S
 
 // CreateStore 创建店铺。
 func (s *B2CService) CreateStore(store *models.Store) error {
+	if store.Platform != "" && !validStorePlatforms[store.Platform] {
+		return errors.New("无效的店铺平台：" + store.Platform + "（允许: amazon/shopify/tiktok/temu）")
+	}
+	if store.Status != "" && !validStoreStatuses[store.Status] {
+		return errors.New("无效的店铺状态：" + store.Status + "（允许: active/expired/revoked）")
+	}
 	return s.storeRepo.Create(store)
 }
 
 // UpdateStore 更新店铺。
 func (s *B2CService) UpdateStore(store *models.Store) error {
+	if store.Platform != "" && !validStorePlatforms[store.Platform] {
+		return errors.New("无效的店铺平台：" + store.Platform + "（允许: amazon/shopify/tiktok/temu）")
+	}
+	if store.Status != "" && !validStoreStatuses[store.Status] {
+		return errors.New("无效的店铺状态：" + store.Status + "（允许: active/expired/revoked）")
+	}
 	return s.storeRepo.Update(store)
 }
 
@@ -55,12 +90,23 @@ func (s *B2CService) ListListings(page, pageSize int, storeID uint, status strin
 
 // CreateListing 创建上架。
 func (s *B2CService) CreateListing(l *models.Listing) error {
+	if l.Status != "" && !validListingStatuses[l.Status] {
+		return errors.New("无效的上架状态：" + l.Status + "（允许: draft/active/paused/closed）")
+	}
 	return s.listingRepo.Create(l)
 }
 
 // UpdateListing 更新上架。
 func (s *B2CService) UpdateListing(l *models.Listing) error {
+	if l.Status != "" && !validListingStatuses[l.Status] {
+		return errors.New("无效的上架状态：" + l.Status + "（允许: draft/active/paused/closed）")
+	}
 	return s.listingRepo.Update(l)
+}
+
+// DeleteListing 删除上架（软删除）。
+func (s *B2CService) DeleteListing(id uint) error {
+	return s.listingRepo.Delete(id)
 }
 
 // ========== 订单 ==========

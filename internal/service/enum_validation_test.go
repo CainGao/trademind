@@ -114,3 +114,72 @@ func TestValidOrderStatuses_RejectInvalid(t *testing.T) {
 		}
 	}
 }
+
+// ===== B2C 店铺平台枚举校验 =====
+
+func TestValidStorePlatforms_AllDefined(t *testing.T) {
+	expected := []string{"amazon", "shopify", "tiktok", "temu"}
+	for _, s := range expected {
+		if !validStorePlatforms[s] {
+			t.Errorf("validStorePlatforms 缺少 %q", s)
+		}
+	}
+	if len(validStorePlatforms) != len(expected) {
+		t.Errorf("validStorePlatforms 有 %d 项，期望 %d", len(validStorePlatforms), len(expected))
+	}
+}
+
+func TestValidStorePlatforms_RejectInvalid(t *testing.T) {
+	invalid := []string{"", "hacked", "AMAZON", "ebay", "walmart", "aliexpress"}
+	for _, s := range invalid {
+		if validStorePlatforms[s] {
+			t.Errorf("validStorePlatforms 不应接受 %q", s)
+		}
+	}
+}
+
+// ===== B2C 店铺状态枚举校验 =====
+
+func TestValidStoreStatuses_AllDefined(t *testing.T) {
+	expected := []string{"active", "expired", "revoked"}
+	for _, s := range expected {
+		if !validStoreStatuses[s] {
+			t.Errorf("validStoreStatuses 缺少 %q", s)
+		}
+	}
+	if len(validStoreStatuses) != len(expected) {
+		t.Errorf("validStoreStatuses 有 %d 项，期望 %d", len(validStoreStatuses), len(expected))
+	}
+}
+
+func TestValidStoreStatuses_RejectInvalid(t *testing.T) {
+	invalid := []string{"", "hacked", "ACTIVE", "disabled", "pending", "suspended"}
+	for _, s := range invalid {
+		if validStoreStatuses[s] {
+			t.Errorf("validStoreStatuses 不应接受 %q", s)
+		}
+	}
+}
+
+// ===== B2C 上架状态枚举校验 =====
+
+func TestValidListingStatuses_AllDefined(t *testing.T) {
+	expected := []string{"draft", "active", "paused", "closed"}
+	for _, s := range expected {
+		if !validListingStatuses[s] {
+			t.Errorf("validListingStatuses 缺少 %q", s)
+		}
+	}
+	if len(validListingStatuses) != len(expected) {
+		t.Errorf("validListingStatuses 有 %d 项，期望 %d", len(validListingStatuses), len(expected))
+	}
+}
+
+func TestValidListingStatuses_RejectInvalid(t *testing.T) {
+	invalid := []string{"", "hacked", "DRAFT", "published", "archived", "deleted"}
+	for _, s := range invalid {
+		if validListingStatuses[s] {
+			t.Errorf("validListingStatuses 不应接受 %q", s)
+		}
+	}
+}

@@ -57,6 +57,7 @@ func NewListingRepo(db *gorm.DB) *ListingRepo {
 
 func (r *ListingRepo) Create(l *models.Listing) error { return r.DB.Create(l).Error }
 func (r *ListingRepo) Update(l *models.Listing) error { return r.DB.Save(l).Error }
+func (r *ListingRepo) Delete(id uint) error            { return r.DB.Delete(&models.Listing{}, id).Error }
 func (r *ListingRepo) FindByID(id uint) (*models.Listing, error) {
 	var l models.Listing
 	err := r.DB.First(&l, id).Error

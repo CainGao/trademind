@@ -204,6 +204,7 @@ func New(cfg *config.Config, db *gorm.DB) (*gin.Engine, *service.SchedulerServic
 		b2c.GET("/listings", b2cHandler.ListListings)
 		b2c.POST("/listings", b2cHandler.CreateListing)
 		b2c.PUT("/listings/:id", b2cHandler.UpdateListing)
+		b2c.DELETE("/listings/:id", b2cHandler.DeleteListing)
 		b2c.GET("/orders", b2cHandler.ListOrders)
 		b2c.POST("/orders", b2cHandler.CreateOrder)
 		b2c.PUT("/orders/:id/status", b2cHandler.UpdateOrderStatus)
