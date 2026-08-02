@@ -70,6 +70,10 @@ func (r *ProductRepo) List(p ListParams) (*ListResult, error) {
 	if p.SortBy == "" {
 		p.SortBy = "created_at"
 	}
+	// 白名单校验排序字段，防止 SQL 注入（gotcha #56）
+	if !isValidSortColumn(p.SortBy) {
+		p.SortBy = "created_at"
+	}
 	if p.Order != "asc" {
 		p.Order = "desc"
 	}
@@ -122,4 +126,18 @@ func (r *ProductRepo) Categories() ([]string, error) {
 		Order("category").
 		Pluck("category", &cats).Error
 	return cats, err
+}
+
+// productSortWhitelist 允许排序的字段白名单（防止 SQL 注入，gotcha #56）。
+var productSortWhitelist = map[string]bool{
+	"created_at":     true,
+	"ai_score":       true,
+	"purchase_price": true,
+	"name":           true,
+	"updated_at":     true,
+}
+
+// isValidSortColumn 检查排序字段是否在白名单内。
+func isValidSortColumn(col string) bool {
+	return productSortWhitelist[col]
 }
