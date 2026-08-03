@@ -10,6 +10,7 @@ package router
 
 import (
 	"path/filepath"
+	"time"
 
 	"github.com/CainGao/trademind/internal/config"
 	"github.com/CainGao/trademind/internal/database"
@@ -112,7 +113,9 @@ func New(cfg *config.Config, db *gorm.DB) (*gin.Engine, *service.SchedulerServic
 	backupSvc := service.NewBackupService(db, backupsDir, filesDir, cfg.App.Version)
 
 	// Handler
-	authHandler := handler.NewAuthHandler(authSvc)
+	loginLimiter := middleware.DefaultLoginLimiter()
+	loginLimiter.StartCleanup(10 * time.Minute) // 定期清理过期记录
+	authHandler := handler.NewAuthHandler(authSvc, loginLimiter)
 	setupHandler := handler.NewSetupHandler(setupSvc)
 	productHandler := handler.NewProductHandler(productSvc)
 	extensionHandler := handler.NewExtensionHandler(extensionSvc)

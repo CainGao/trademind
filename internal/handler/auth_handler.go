@@ -8,7 +8,9 @@ package handler
 
 import (
 	"errors"
+	"fmt"
 
+	"github.com/CainGao/trademind/internal/middleware"
 	"github.com/CainGao/trademind/internal/models"
 	"github.com/CainGao/trademind/internal/pkg/response"
 	"github.com/CainGao/trademind/internal/service"
@@ -17,12 +19,13 @@ import (
 
 // AuthHandler 认证处理器。
 type AuthHandler struct {
-	svc *service.AuthService
+	svc     *service.AuthService
+	limiter *middleware.LoginLimiter
 }
 
 // NewAuthHandler 创建处理器。
-func NewAuthHandler(svc *service.AuthService) *AuthHandler {
-	return &AuthHandler{svc: svc}
+func NewAuthHandler(svc *service.AuthService, limiter *middleware.LoginLimiter) *AuthHandler {
+	return &AuthHandler{svc: svc, limiter: limiter}
 }
 
 // RegisterRoutes 注册 /auth/* 路由（公开）。
@@ -43,9 +46,23 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		response.BadRequest(c, "参数错误: "+err.Error())
 		return
 	}
+
+	// 防暴力破解：检查是否被限流
+	if !h.limiter.Allow(input.Username) {
+		remaining := h.limiter.LockoutRemaining(input.Username)
+		mins := int(remaining.Minutes())
+		if mins < 1 {
+			mins = 1
+		}
+		c.Header("Retry-After", fmt.Sprintf("%d", int(remaining.Seconds())))
+		response.TooManyRequests(c, fmt.Sprintf("登录尝试过多，账号已被临时锁定，请 %d 分钟后再试", mins))
+		return
+	}
+
 	pair, err := h.svc.Login(input, c.ClientIP())
 	if err != nil {
 		if errors.Is(err, service.ErrInvalidCredentials) {
+			h.limiter.RecordFailure(input.Username) // 记录失败
 			response.Unauthorized(c, err.Error())
 			return
 		}
@@ -56,6 +73,9 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		response.InternalError(c, "登录失败")
 		return
 	}
+
+	// 登录成功 → 清除失败计数
+	h.limiter.RecordSuccess(input.Username)
 	response.Success(c, pair)
 }
 

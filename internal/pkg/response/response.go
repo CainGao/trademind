@@ -78,3 +78,9 @@ func Conflict(c *gin.Context, msg string) {
 func InternalError(c *gin.Context, msg string) {
 	c.JSON(500, Response{Code: 5000, Message: msg})
 }
+
+// TooManyRequests 请求过多/被限流（HTTP 429）—— 登录防暴力破解等场景。
+// 调用方可在调用前设置 c.Header("Retry-After", "300")。
+func TooManyRequests(c *gin.Context, msg string) {
+	c.JSON(429, Response{Code: 2004, Message: msg})
+}
