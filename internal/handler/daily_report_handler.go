@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/CainGao/trademind/internal/models"
+	"github.com/CainGao/trademind/internal/pkg/pagination"
 	"github.com/CainGao/trademind/internal/pkg/response"
 	"github.com/CainGao/trademind/internal/service"
 	"github.com/gin-gonic/gin"
@@ -54,8 +55,8 @@ func (h *DailyReportHandler) Generate(c *gin.Context) {
 
 // List GET /api/daily-reports?page=1&page_size=20
 func (h *DailyReportHandler) List(c *gin.Context) {
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
+	page := atoiDefault(c.Query("page"), 1, 0)
+	pageSize := atoiDefault(c.Query("page_size"), 20, pagination.MaxPageSize)
 
 	items, total, err := h.svc.List(page, pageSize)
 	if err != nil {

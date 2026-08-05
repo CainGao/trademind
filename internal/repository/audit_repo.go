@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/CainGao/trademind/internal/models"
+	"github.com/CainGao/trademind/internal/pkg/pagination"
 	"gorm.io/gorm"
 )
 
@@ -36,6 +37,7 @@ func (r *AuditLogRepo) Log(userID uint, action, resource string, resourceID *uin
 
 // ListByUser 查某用户的审计记录。
 func (r *AuditLogRepo) ListByUser(userID uint, page, size int) ([]models.AuditLog, int64, error) {
+	page, size = pagination.Normalize(page, size)
 	var logs []models.AuditLog
 	var total int64
 	q := r.DB.Model(&models.AuditLog{}).Where("user_id = ?", userID)
@@ -47,6 +49,7 @@ func (r *AuditLogRepo) ListByUser(userID uint, page, size int) ([]models.AuditLo
 
 // ListByAction 查某类操作。
 func (r *AuditLogRepo) ListByAction(action string, since time.Time, page, size int) ([]models.AuditLog, int64, error) {
+	page, size = pagination.Normalize(page, size)
 	var logs []models.AuditLog
 	var total int64
 	q := r.DB.Model(&models.AuditLog{}).Where("action = ? AND created_at >= ?", action, since)

@@ -12,6 +12,7 @@ package handler
 import (
 	"strconv"
 
+	"github.com/CainGao/trademind/internal/pkg/pagination"
 	"github.com/CainGao/trademind/internal/pkg/response"
 	"github.com/CainGao/trademind/internal/service"
 	"github.com/gin-gonic/gin"
@@ -36,8 +37,8 @@ func (h *SupplierHandler) RegisterRoutes(r *gin.RouterGroup) {
 
 func (h *SupplierHandler) List(c *gin.Context) {
 	q := service.SupplierListQuery{
-		Page:      atoiDefault(c.Query("page"), 1),
-		PageSize:  atoiDefault(c.Query("page_size"), 20),
+		Page:      atoiDefault(c.Query("page"), 1, 0),
+		PageSize:  atoiDefault(c.Query("page_size"), 20, pagination.MaxPageSize),
 		Keyword:   c.Query("keyword"),
 		Source:    c.Query("source"),
 		RiskLevel: c.Query("risk_level"),
@@ -79,8 +80,8 @@ func (h *SupplierHandler) Products(c *gin.Context) {
 		response.BadRequest(c, "无效的 ID")
 		return
 	}
-	page := atoiDefault(c.Query("page"), 1)
-	pageSize := atoiDefault(c.Query("page_size"), 20)
+	page := atoiDefault(c.Query("page"), 1, 0)
+	pageSize := atoiDefault(c.Query("page_size"), 20, pagination.MaxPageSize)
 	items, total, err := h.svc.Products(uint(id), page, pageSize)
 	if err != nil {
 		response.InternalError(c, "查询失败")

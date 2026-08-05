@@ -19,6 +19,7 @@ import (
 	"strconv"
 
 	"github.com/CainGao/trademind/internal/models"
+	"github.com/CainGao/trademind/internal/pkg/pagination"
 	"github.com/CainGao/trademind/internal/pkg/response"
 	"github.com/CainGao/trademind/internal/service"
 	"github.com/gin-gonic/gin"
@@ -38,8 +39,8 @@ func NewB2CHandler(svc *service.B2CService) *B2CHandler {
 
 // ListStores GET /api/b2c/stores?platform=amazon
 func (h *B2CHandler) ListStores(c *gin.Context) {
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
+	page := atoiDefault(c.Query("page"), 1, 0)
+	pageSize := atoiDefault(c.Query("page_size"), 20, pagination.MaxPageSize)
 	platform := c.Query("platform")
 
 	items, total, err := h.svc.ListStores(page, pageSize, platform)
@@ -102,8 +103,8 @@ func (h *B2CHandler) DeleteStore(c *gin.Context) {
 
 // ListListings GET /api/b2c/listings?store_id=1&status=active
 func (h *B2CHandler) ListListings(c *gin.Context) {
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
+	page := atoiDefault(c.Query("page"), 1, 0)
+	pageSize := atoiDefault(c.Query("page_size"), 20, pagination.MaxPageSize)
 	storeID, _ := strconv.ParseUint(c.Query("store_id"), 10, 64)
 	status := c.Query("status")
 
@@ -167,8 +168,8 @@ func (h *B2CHandler) DeleteListing(c *gin.Context) {
 
 // ListOrders GET /api/b2c/orders?store_id=1&status=paid&country=US
 func (h *B2CHandler) ListOrders(c *gin.Context) {
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
+	page := atoiDefault(c.Query("page"), 1, 0)
+	pageSize := atoiDefault(c.Query("page_size"), 20, pagination.MaxPageSize)
 	storeID, _ := strconv.ParseUint(c.Query("store_id"), 10, 64)
 	status := c.Query("status")
 	country := c.Query("country")

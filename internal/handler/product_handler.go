@@ -12,6 +12,7 @@ package handler
 import (
 	"strconv"
 
+	"github.com/CainGao/trademind/internal/pkg/pagination"
 	"github.com/CainGao/trademind/internal/pkg/response"
 	"github.com/CainGao/trademind/internal/service"
 	"github.com/gin-gonic/gin"
@@ -107,8 +108,8 @@ func (h *ProductHandler) Delete(c *gin.Context) {
 // GET /api/products?page=1&page_size=20&keyword=手机壳&category=配件&source=1688&sort_by=created_at&order=desc
 func (h *ProductHandler) List(c *gin.Context) {
 	q := service.ListQuery{
-		Page:     atoiDefault(c.Query("page"), 1),
-		PageSize: atoiDefault(c.Query("page_size"), 20),
+		Page:     atoiDefault(c.Query("page"), 1, 0),
+		PageSize: atoiDefault(c.Query("page_size"), 20, pagination.MaxPageSize),
 		Keyword:  c.Query("keyword"),
 		Category: c.Query("category"),
 		Source:   c.Query("source"),
@@ -134,13 +135,19 @@ func (h *ProductHandler) Categories(c *gin.Context) {
 	response.Success(c, cats)
 }
 
-func atoiDefault(s string, def int) int {
+// atoiDefault parses an int from a query string, returning def on error/empty.
+// max > 0 caps the value (use for page_size to prevent unbounded LIMIT).
+// max == 0 means no cap (use for page number).
+func atoiDefault(s string, def, max int) int {
 	if s == "" {
 		return def
 	}
 	n, err := strconv.Atoi(s)
 	if err != nil || n < 1 {
 		return def
+	}
+	if max > 0 && n > max {
+		return max
 	}
 	return n
 }

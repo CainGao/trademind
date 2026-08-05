@@ -4,6 +4,7 @@ package handler
 import (
 	"strconv"
 
+	"github.com/CainGao/trademind/internal/pkg/pagination"
 	"github.com/CainGao/trademind/internal/pkg/response"
 	"github.com/CainGao/trademind/internal/service"
 	"github.com/gin-gonic/gin"
@@ -45,8 +46,8 @@ func (h *B2BHandler) RegisterRoutes(r *gin.RouterGroup) {
 
 func (h *B2BHandler) ListCustomers(c *gin.Context) {
 	q := service.CustomerListQuery{
-		Page: atoiDefault(c.Query("page"), 1),
-		PageSize: atoiDefault(c.Query("page_size"), 20),
+		Page: atoiDefault(c.Query("page"), 1, 0),
+		PageSize: atoiDefault(c.Query("page_size"), 20, pagination.MaxPageSize),
 		Keyword: c.Query("keyword"),
 		Country: c.Query("country"),
 		Stage: c.Query("stage"),
@@ -115,8 +116,8 @@ func (h *B2BHandler) DeleteCustomer(c *gin.Context) {
 
 func (h *B2BHandler) ListInquiries(c *gin.Context) {
 	q := service.InquiryListQuery{
-		Page: atoiDefault(c.Query("page"), 1),
-		PageSize: atoiDefault(c.Query("page_size"), 20),
+		Page: atoiDefault(c.Query("page"), 1, 0),
+		PageSize: atoiDefault(c.Query("page_size"), 20, pagination.MaxPageSize),
 		Source: c.Query("source"),
 		Status: c.Query("status"),
 	}
@@ -168,8 +169,8 @@ func (h *B2BHandler) DeleteInquiry(c *gin.Context) {
 
 func (h *B2BHandler) ListQuotations(c *gin.Context) {
 	q := service.QuotationListQuery{
-		Page: atoiDefault(c.Query("page"), 1),
-		PageSize: atoiDefault(c.Query("page_size"), 20),
+		Page: atoiDefault(c.Query("page"), 1, 0),
+		PageSize: atoiDefault(c.Query("page_size"), 20, pagination.MaxPageSize),
 		Status: c.Query("status"),
 	}
 	res, err := h.quotationSvc.List(q)
