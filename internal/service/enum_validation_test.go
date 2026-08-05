@@ -183,3 +183,30 @@ func TestValidListingStatuses_RejectInvalid(t *testing.T) {
 		}
 	}
 }
+
+// ===== 调度器 Agent 类型白名单校验 (gotcha #60) =====
+
+func TestValidSchedulableAgents_AllDefined(t *testing.T) {
+	expected := []models.AgentType{models.AgentSelection, models.AgentSourcing}
+	for _, a := range expected {
+		if !validSchedulableAgents[a] {
+			t.Errorf("validSchedulableAgents 缺少 %q", a)
+		}
+	}
+	if len(validSchedulableAgents) != len(expected) {
+		t.Errorf("validSchedulableAgents 有 %d 项，期望 %d", len(validSchedulableAgents), len(expected))
+	}
+}
+
+func TestValidSchedulableAgents_RejectInvalid(t *testing.T) {
+	// 这些 Agent 类型存在但不应有定时调度
+	invalid := []models.AgentType{
+		"hacked", "", "report", "email", "inquiry",
+		"quotation", "listing", "ad", "review", "analysis",
+	}
+	for _, a := range invalid {
+		if validSchedulableAgents[a] {
+			t.Errorf("validSchedulableAgents 不应接受 %q", a)
+		}
+	}
+}

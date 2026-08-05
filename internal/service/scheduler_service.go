@@ -87,8 +87,20 @@ type AgentScheduleItem struct {
 	Enabled   bool   `json:"enabled"`
 }
 
+// validSchedulableAgents 可配置定时的 Agent 类型白名单（gotcha #55/#60 模式）。
+// 只有 selection 和 sourcing 有定时调度入口，其他 Agent（analysis/email/review 等）
+// 都是用户手动触发的，不应允许通过 API 设置它们的定时。
+var validSchedulableAgents = map[models.AgentType]bool{
+	models.AgentSelection: true,
+	models.AgentSourcing:  true,
+}
+
 // UpdateSchedule 更新某个 Agent 的定时（持久化到 settings + 重启调度器）。
 func (s *SchedulerService) UpdateSchedule(t models.AgentType, cronExpr string) error {
+	// 0. 校验 Agent 类型（只允许有定时调度入口的类型）
+	if !validSchedulableAgents[t] {
+		return fmt.Errorf("不支持的 Agent 类型: %s（仅支持: selection, sourcing）", t)
+	}
 	// 1. 校验表达式
 	if _, err := cron.ParseStandard(cronExpr); err != nil {
 		return fmt.Errorf("cron 表达式非法: %w", err)
