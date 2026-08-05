@@ -32,9 +32,21 @@ func (r *BehaviorRepo) CreateBatch(events []models.BehaviorEvent) error {
 	return r.DB.CreateInBatches(events, 100).Error
 }
 
+// clampDays 将天数参数限制到安全范围 [1, maxStatsDays]，越界回退默认值。
+// 防止 ?days=99999999 导致全表扫描聚合（gotcha #59）。
+const maxStatsDays = 90
+
+func clampDays(days int) int {
+	if days < 1 || days > maxStatsDays {
+		return 14
+	}
+	return days
+}
+
 // StatsByType 按事件类型聚合近 N 天的统计（老板驾驶舱用）。
 // 返回 [{event_type, cnt}]。
 func (r *BehaviorRepo) StatsByType(days int) ([]map[string]interface{}, error) {
+	days = clampDays(days)
 	since := time.Now().AddDate(0, 0, -days)
 	var rows []map[string]interface{}
 	err := r.DB.Model(&models.BehaviorEvent{}).
@@ -49,9 +61,7 @@ func (r *BehaviorRepo) StatsByType(days int) ([]map[string]interface{}, error) {
 // DailyTrend 近 N 天每日事件数趋势（驾驶舱折线图用）。
 // 返回 [{date: "2026-07-19", total: 42, browse: 20, search: 15, collect: 5, favorite: 2}, ...]
 func (r *BehaviorRepo) DailyTrend(days int) ([]map[string]interface{}, error) {
-	if days < 1 || days > 90 {
-		days = 14
-	}
+	days = clampDays(days)
 	since := time.Now().AddDate(0, 0, -(days - 1))
 	var rows []map[string]interface{}
 	// SQLite date() 函数截取到天
@@ -72,6 +82,7 @@ func (r *BehaviorRepo) DailyTrend(days int) ([]map[string]interface{}, error) {
 
 // TopKeywords 近 N 天最热门的搜索关键词 Top N（target_id 是关键词）。
 func (r *BehaviorRepo) TopKeywords(days, limit int) ([]map[string]interface{}, error) {
+	days = clampDays(days)
 	if limit < 1 || limit > 50 {
 		limit = 10
 	}
