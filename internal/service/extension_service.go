@@ -31,6 +31,17 @@ func NewExtensionService(pr *repository.ProductRepo, sr *repository.SupplierRepo
 	return &ExtensionService{productRepo: pr, supplierRepo: sr, behaviorRepo: br}
 }
 
+// validBehaviorEventTypes 行为事件类型白名单（gotcha #55 枚举校验）。
+// 与 models.BehaviorEvent 注释中的 6 种类型一致，防止脏数据入库。
+var validBehaviorEventTypes = map[string]bool{
+	"browse":   true,
+	"search":   true,
+	"collect":  true,
+	"favorite": true,
+	"export":   true,
+	"compare":  true,
+}
+
 // SupplierInfo 采集到的供应商信息（嵌在商品采集数据里）。
 type SupplierInfo struct {
 	Name     string `json:"name"`
@@ -125,9 +136,8 @@ func (s *ExtensionService) CollectProduct(userID uint, in CollectProductInput) (
 			"package_spec":  in.PackageSpec,
 			"scenarios":     string(scenJSON),
 		}
-		if in.Price != "" {
-			p, _ := decimal.NewFromString(in.Price)
-			updates["purchase_price"] = p
+		if d, ok := safeParseDecimal(in.Price); ok {
+			updates["purchase_price"] = d
 		}
 		if in.PriceCurrency != "" {
 			updates["purchase_currency"] = in.PriceCurrency
@@ -135,9 +145,8 @@ func (s *ExtensionService) CollectProduct(userID uint, in CollectProductInput) (
 		if in.MOQ != nil {
 			updates["b2b_moq"] = in.MOQ
 		}
-		if in.WeightKG != "" {
-			w, _ := decimal.NewFromString(in.WeightKG)
-			updates["weight_kg"] = w
+		if d, ok := safeParseDecimal(in.WeightKG); ok {
+			updates["weight_kg"] = d
 		}
 		if supplierID != nil {
 			updates["supplier_id"] = supplierID
@@ -156,8 +165,8 @@ func (s *ExtensionService) CollectProduct(userID uint, in CollectProductInput) (
 	}
 
 	// 5. 新建
-	price, _ := decimal.NewFromString(in.Price)
-	weight, _ := decimal.NewFromString(in.WeightKG)
+	price, _ := safeParseDecimal(in.Price)
+	weight, _ := safeParseDecimal(in.WeightKG)
 	p := &models.Product{
 		Name:             in.Name,
 		Category:         in.Category,
@@ -202,6 +211,9 @@ func (s *ExtensionService) ReportBehavior(userID uint, in BehaviorInput) error {
 	if in.EventType == "" {
 		return errors.New("event_type 不能为空")
 	}
+	if !validBehaviorEventTypes[in.EventType] {
+		return errors.New("无效的 event_type: " + in.EventType)
+	}
 	var metaJSON string
 	if len(in.TargetMeta) > 0 {
 		b, _ := json.Marshal(in.TargetMeta)
@@ -230,7 +242,7 @@ func (s *ExtensionService) ReportBehaviorBatch(userID uint, inputs []BehaviorInp
 	}
 	events := make([]models.BehaviorEvent, 0, len(inputs))
 	for _, in := range inputs {
-		if in.EventType == "" {
+		if in.EventType == "" || !validBehaviorEventTypes[in.EventType] {
 			continue
 		}
 		var metaJSON string
@@ -295,4 +307,18 @@ func derefUint(p *uint) uint {
 		return 0
 	}
 	return *p
+}
+
+// safeParseDecimal 安全解析金额/重量字符串（gotcha #53 同类修复）。
+// 插件采集数据不一定可靠（如"面议"、含空格等），解析失败时返回 false，
+// 调用方应跳过该字段而非写入零值。空字符串同样返回 false。
+func safeParseDecimal(s string) (decimal.Decimal, bool) {
+	if strings.TrimSpace(s) == "" {
+		return decimal.Zero, false
+	}
+	d, err := decimal.NewFromString(s)
+	if err != nil {
+		return decimal.Zero, false
+	}
+	return d, true
 }
