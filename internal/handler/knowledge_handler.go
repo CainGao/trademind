@@ -25,6 +25,14 @@ type KnowledgeHandler struct {
 	svc *service.KnowledgeService
 }
 
+// 知识库输入长度限制（防止超大输入导致内存耗尽或 AI context 溢出）。
+const (
+	maxPasteTextLen   = 500 * 1024 // 粘贴文本最大 500KB
+	maxSearchQueryLen = 10 * 1024  // 检索查询最大 10KB
+	maxChatQueryLen   = 10 * 1024  // RAG 对话查询最大 10KB
+	maxChatHistoryLen = 50 * 1024  // RAG 对话历史最大 50KB
+)
+
 // NewKnowledgeHandler 构造。
 func NewKnowledgeHandler(svc *service.KnowledgeService) *KnowledgeHandler {
 	return &KnowledgeHandler{svc: svc}
@@ -85,6 +93,10 @@ func (h *KnowledgeHandler) Paste(c *gin.Context) {
 	var req PasteRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, "参数错误: "+err.Error())
+		return
+	}
+	if len(req.Content) > maxPasteTextLen {
+		response.BadRequest(c, "文本内容不能超过 500KB")
 		return
 	}
 	userID := c.GetUint("user_id")
@@ -175,6 +187,10 @@ func (h *KnowledgeHandler) Search(c *gin.Context) {
 		response.BadRequest(c, "参数错误: "+err.Error())
 		return
 	}
+	if len(req.Query) > maxSearchQueryLen {
+		response.BadRequest(c, "查询内容不能超过 10KB")
+		return
+	}
 	results, err := h.svc.Search(req.Query, req.FileID, req.TopK)
 	if err != nil {
 		response.InternalError(c, "检索失败: "+err.Error())
@@ -196,6 +212,14 @@ func (h *KnowledgeHandler) Chat(c *gin.Context) {
 	var req ChatRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, "参数错误: "+err.Error())
+		return
+	}
+	if len(req.Query) > maxChatQueryLen {
+		response.BadRequest(c, "问题内容不能超过 10KB")
+		return
+	}
+	if len(req.History) > maxChatHistoryLen {
+		response.BadRequest(c, "对话历史不能超过 50KB")
 		return
 	}
 	provider := service.AIProvider(c.DefaultQuery("provider", req.Provider))

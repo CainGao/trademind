@@ -31,6 +31,7 @@ const (
 	defaultOverlap   = 100 // 切片重叠字符数
 	embedBatchSize   = 20  // 单次 Embedding API 请求的文本数（OpenAI 限制 input 数组长度）
 	maxContextChars  = 4000 // RAG 注入上下文的最大字符数
+	maxIngestTextLen = 500 * 1024 // 粘贴/手动录入文本最大长度 500KB
 )
 
 // KnowledgeService 知识库业务。
@@ -115,8 +116,14 @@ func (s *KnowledgeService) IngestText(title, content string, userID uint) (*Uplo
 	if content == "" {
 		return nil, errors.New("文本内容不能为空")
 	}
+	if len(content) > maxIngestTextLen {
+		return nil, fmt.Errorf("文本内容不能超过 %dKB", maxIngestTextLen/1024)
+	}
 	if title == "" {
 		title = "粘贴文本"
+	}
+	if len(title) > 255 {
+		title = title[:255]
 	}
 
 	file := &models.KnowledgeFile{
