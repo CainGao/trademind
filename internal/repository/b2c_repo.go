@@ -176,7 +176,8 @@ func (r *InventoryRepo) Upsert(inv *models.Inventory) error {
 }
 
 // LowStock 低库存预警（quantity < threshold）。
+// 加 LIMIT 防止超大数据集内存耗尽（gotcha #58 同类问题）。
 func (r *InventoryRepo) LowStock(threshold int) (items []models.Inventory, err error) {
-	err = r.DB.Where("quantity < ?", threshold).Find(&items).Error
+	err = r.DB.Where("quantity < ?", threshold).Order("quantity ASC").Limit(500).Find(&items).Error
 	return
 }

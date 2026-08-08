@@ -137,6 +137,11 @@ func (s *SchedulerService) Start() error {
 	// 注册日报任务（每天 18:00），仅当注入了 dailyReportSvc
 	if s.dailyReportSvc != nil {
 		if _, err := s.cron.AddFunc("0 18 * * *", func() {
+			defer func() {
+				if r := recover(); r != nil {
+					log.Printf("[scheduler] 日报任务 panic（已恢复）: %v", r)
+				}
+			}()
 			log.Println("[scheduler] 触发日报生成")
 			report, err := s.dailyReportSvc.Generate("", models.TriggerCron)
 			if err != nil {
@@ -174,7 +179,13 @@ func (s *SchedulerService) register(t models.AgentType) error {
 }
 
 // runAgent 实际执行 Agent（被 cron 触发）。
+// 使用 defer/recover 保护：定时任务 panic 不应崩溃整个进程（gotcha #42 延伸）。
 func (s *SchedulerService) runAgent(t models.AgentType) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("[scheduler] %s Agent panic（已恢复）: %v", t, r)
+		}
+	}()
 	log.Printf("[scheduler] 触发 %s Agent", t)
 	var err error
 	switch t {
