@@ -11,6 +11,8 @@
 package handler
 
 import (
+	"fmt"
+
 	"github.com/CainGao/trademind/internal/models"
 	"github.com/CainGao/trademind/internal/pkg/response"
 	"github.com/CainGao/trademind/internal/service"
@@ -69,6 +71,9 @@ func (h *ExtensionHandler) ReportBehavior(c *gin.Context) {
 	response.Success(c, gin.H{"reported": true})
 }
 
+// maxBatchEvents 批量上报单次最大事件数（防内存耗尽，同 gotcha #58 上限校验）。
+const maxBatchEvents = 100
+
 // ReportBehaviorBatch 批量上报行为。
 // POST /api/extension/behavior/batch
 //
@@ -79,6 +84,10 @@ func (h *ExtensionHandler) ReportBehaviorBatch(c *gin.Context) {
 	}
 	if err := c.ShouldBindJSON(&body); err != nil {
 		response.BadRequest(c, "参数错误: "+err.Error())
+		return
+	}
+	if len(body.Events) > maxBatchEvents {
+		response.BadRequest(c, fmt.Sprintf("单次最多上报 %d 条事件，当前 %d 条", maxBatchEvents, len(body.Events)))
 		return
 	}
 	userID := c.MustGet("user_id").(uint)

@@ -146,7 +146,10 @@ func (s *AIService) Chat(req ChatRequest) (*ChatResponse, error) {
 
 	// 4. 发起请求
 	url := providerEndpoints[provider]
-	httpReq, _ := http.NewRequest("POST", url, bytes.NewReader(bodyBytes))
+	httpReq, err := http.NewRequest("POST", url, bytes.NewReader(bodyBytes))
+	if err != nil {
+		return nil, fmt.Errorf("构造 %s 请求失败: %w", provider, err)
+	}
 	httpReq.Header.Set("Content-Type", "application/json")
 	httpReq.Header.Set("Authorization", "Bearer "+apiKey)
 
@@ -328,7 +331,10 @@ func (s *AIService) Embed(texts []string, specified AIProvider) (*EmbeddingRespo
 	bodyBytes, _ := json.Marshal(body)
 
 	url := providerEmbeddingEndpoint[provider]
-	httpReq, _ := http.NewRequest("POST", url, bytes.NewReader(bodyBytes))
+	httpReq, err := http.NewRequest("POST", url, bytes.NewReader(bodyBytes))
+	if err != nil {
+		return nil, fmt.Errorf("构造 %s 嵌入请求失败: %w", provider, err)
+	}
 	httpReq.Header.Set("Content-Type", "application/json")
 	httpReq.Header.Set("Authorization", "Bearer "+apiKey)
 

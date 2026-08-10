@@ -65,6 +65,11 @@ func (s *AgentService) AnalyzeEmail(subject, content string, provider AIProvider
 
 	user := fmt.Sprintf("邮件主题: %s\n\n邮件正文:\n%s", subject, content)
 
+	// 截断超长输入防止 agent_runs.input 列膨胀（handler 已做 50KB 上限，此处 defense-in-depth）。
+	if len(user) > 52*1024 {
+		user = user[:52*1024] + "\n...(truncated)"
+	}
+
 	run := &models.AgentRun{
 		AgentType:   models.AgentEmail,
 		TriggeredBy: triggeredBy,

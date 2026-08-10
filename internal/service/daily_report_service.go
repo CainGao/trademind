@@ -338,7 +338,10 @@ func (s *DailyReportService) DeliverToFeishu(reportID uint) error {
 	body, _ := json.Marshal(payload)
 
 	// 5. POST 到飞书
-	req, _ := http.NewRequest("POST", webhookURL.Value, bytes.NewReader(body))
+	req, err := http.NewRequest("POST", webhookURL.Value, bytes.NewReader(body))
+	if err != nil {
+		return fmt.Errorf("飞书 webhook URL 无效: %w", err)
+	}
 	req.Header.Set("Content-Type", "application/json")
 	client := &http.Client{Timeout: 15 * time.Second}
 	resp, err := client.Do(req)

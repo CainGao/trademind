@@ -17,6 +17,21 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// Agent 输入文本长度上限（防御 AI context 溢出 + DB 膨胀，同 gotcha #61）。
+const (
+	maxEmailSubjectLen = 1 * 1024  // 邮件主题最大 1KB
+	maxEmailContentLen = 50 * 1024 // 邮件正文最大 50KB
+	maxReviewsLen      = 50 * 1024 // 评论文本最大 50KB
+)
+
+// validListingPlatforms OptimizeListing 允许的平台枚举（同 gotcha #55 枚举校验）。
+var validListingPlatforms = map[string]bool{
+	"amazon":  true,
+	"shopify": true,
+	"tiktok":  true,
+	"temu":    true,
+}
+
 // AgentHandler Agent 相关 HTTP 端点。
 type AgentHandler struct {
 	agentSvc *service.AgentService
@@ -161,6 +176,14 @@ func (h *AgentHandler) AnalyzeEmail(c *gin.Context) {
 		response.BadRequest(c, "参数错误: "+err.Error())
 		return
 	}
+	if len(req.Subject) > maxEmailSubjectLen {
+		response.BadRequest(c, "邮件主题不能超过 1KB")
+		return
+	}
+	if len(req.Content) > maxEmailContentLen {
+		response.BadRequest(c, "邮件正文不能超过 50KB")
+		return
+	}
 	provider := service.AIProvider(c.DefaultQuery("provider", ""))
 	analysis, run, err := h.agentSvc.AnalyzeEmail(req.Subject, req.Content, provider, models.TriggerUser)
 	if err != nil {
@@ -215,6 +238,10 @@ func (h *AgentHandler) OptimizeListing(c *gin.Context) {
 		return
 	}
 	platform := c.DefaultQuery("platform", "amazon")
+	if !validListingPlatforms[platform] {
+		response.BadRequest(c, "不支持的平台: " + platform + "（支持: amazon, shopify, tiktok, temu）")
+		return
+	}
 	provider := service.AIProvider(c.DefaultQuery("provider", ""))
 	opt, run, err := h.agentSvc.OptimizeListing(uint(productID), platform, provider, models.TriggerUser)
 	if err != nil {
@@ -234,6 +261,10 @@ func (h *AgentHandler) AnalyzeReviews(c *gin.Context) {
 	var req ReviewsAnalysisReq
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, "参数错误: "+err.Error())
+		return
+	}
+	if len(req.Reviews) > maxReviewsLen {
+		response.BadRequest(c, "评论内容不能超过 50KB")
 		return
 	}
 	provider := service.AIProvider(c.DefaultQuery("provider", ""))
