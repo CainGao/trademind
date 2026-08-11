@@ -9,6 +9,7 @@
 package router
 
 import (
+	"log"
 	"path/filepath"
 	"time"
 
@@ -132,6 +133,11 @@ func New(cfg *config.Config, db *gorm.DB) (*gin.Engine, *service.SchedulerServic
 	// 启动 Agent 定时调度器（选品/采购 Agent，默认每天 9:00 / 10:00）
 	// 即使没有配置 AI Key 也启动——任务会失败但记录到 agent_runs，老板能在前端看到。
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Printf("[router] 调度器启动 panic（已恢复）: %v", r)
+			}
+		}()
 		if err := schedSvc.Start(); err != nil {
 			// 调度器启动失败不阻塞 HTTP 服务，只记录日志
 			_ = err // log 会在 scheduler_service.go 里打

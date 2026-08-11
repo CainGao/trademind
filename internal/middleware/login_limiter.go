@@ -6,6 +6,7 @@
 package middleware
 
 import (
+	"log"
 	"sync"
 	"time"
 )
@@ -158,6 +159,11 @@ func (l *LoginLimiter) StartCleanup(interval time.Duration) func() {
 	ticker := time.NewTicker(interval)
 	done := make(chan struct{})
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Printf("[login-limiter] 清理 goroutine panic（已恢复）: %v", r)
+			}
+		}()
 		for {
 			select {
 			case <-ticker.C:

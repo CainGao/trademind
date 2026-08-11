@@ -26,7 +26,14 @@ type PageData struct {
 }
 
 // Success 成功响应。
+// 对 slice 类型自动将 nil 转为空数组，防止 JSON 输出 null（gotcha #45 扩展）。
 func Success(c *gin.Context, data interface{}) {
+	if data != nil {
+		v := reflect.ValueOf(data)
+		if v.Kind() == reflect.Slice && v.IsNil() {
+			data = reflect.MakeSlice(v.Type(), 0, 0).Interface()
+		}
+	}
 	c.JSON(200, Response{Code: 0, Message: "success", Data: data})
 }
 

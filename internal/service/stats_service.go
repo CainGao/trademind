@@ -62,10 +62,18 @@ func (s *StatsService) Dashboard(trendDays int) (*Dashboard, error) {
 		BehaviorOverview: behOv,
 		SupplierOverview: supOv,
 		ProductTotal:     prodList.Total,
-		DailyTrend:       trend,
-		TopKeywords:      kw,
-		StatsByType:      byType,
+		DailyTrend:       ensureSlice(trend),
+		TopKeywords:      ensureSlice(kw),
+		StatsByType:      ensureSlice(byType),
 	}, nil
+}
+
+// ensureSlice converts a nil slice to an empty slice (prevents JSON null).
+func ensureSlice(rows []map[string]interface{}) []map[string]interface{} {
+	if rows == nil {
+		return []map[string]interface{}{}
+	}
+	return rows
 }
 
 // DailyTrend 趋势图单独接口（前端可指定天数）。
