@@ -63,6 +63,31 @@ type UploadResult struct {
 	Warning    string                `json:"warning,omitempty"` // 部分失败的警告
 }
 
+// sanitizeFilename 净化文件名，防止路径穿越攻击。
+// 去除目录前缀 + 替换路径分隔符 + 截断超长文件名。
+func sanitizeFilename(name string) string {
+	// 取 basename 去掉目录部分（防 ../../etc/passwd.txt）
+	name = filepath.Base(name)
+	// 替换剩余的路径分隔符（basename 后理论上没有了，但 Windows \ 可能残留）
+	name = strings.ReplaceAll(name, "/", "_")
+	name = strings.ReplaceAll(name, "\\", "_")
+	// 去掉空字节（某些畸形输入）
+	name = strings.ReplaceAll(name, "\x00", "")
+	// 限制长度（保留扩展名）
+	if len(name) > 200 {
+		ext := filepath.Ext(name)
+		base := strings.TrimSuffix(name, ext)
+		if len(ext) > 20 {
+			ext = ext[:20] // 超长扩展名也截断
+		}
+		name = base[:200-len(ext)] + ext
+	}
+	if name == "" || name == "." || name == ".." {
+		name = "unnamed"
+	}
+	return name
+}
+
 // IngestFile 处理上传的文件（multipart 已保存到临时路径）。
 // filename 是原始文件名，src 是可读的文件数据。
 func (s *KnowledgeService) IngestFile(filename string, fileSize int64, src io.Reader, userID uint) (*UploadResult, error) {
@@ -72,10 +97,13 @@ func (s *KnowledgeService) IngestFile(filename string, fileSize int64, src io.Re
 		return nil, fmt.Errorf("暂不支持 .%s 格式（支持 txt/md/csv/docx），可直接粘贴文本", strings.TrimPrefix(ext, "."))
 	}
 
+	// 净化文件名（防路径穿越，gotcha #67）
+	safeName := sanitizeFilename(filename)
+
 	// 1. 创建文件记录（status=processing）
 	file := &models.KnowledgeFile{
-		Title:      strings.TrimSuffix(filename, filepath.Ext(filename)),
-		Filename:   filename,
+		Title:      strings.TrimSuffix(safeName, filepath.Ext(safeName)),
+		Filename:   safeName,
 		FileType:   strings.TrimPrefix(ext, "."),
 		FileSize:   fileSize,
 		Status:     models.FileStatusProcessing,
@@ -90,8 +118,13 @@ func (s *KnowledgeService) IngestFile(filename string, fileSize int64, src io.Re
 		s.markFailed(file, "创建文件目录失败: "+err.Error())
 		return nil, fmt.Errorf("创建文件目录失败: %w", err)
 	}
-	storedName := fmt.Sprintf("%d_%s", file.ID, filename)
+	storedName := fmt.Sprintf("%d_%s", file.ID, safeName)
 	storedPath := filepath.Join(s.filesDir, storedName)
+	// 二次验证：确保最终路径在 filesDir 内（defense-in-depth）
+	if !strings.HasPrefix(filepath.Clean(storedPath), filepath.Clean(s.filesDir)) {
+		s.markFailed(file, "文件名非法")
+		return nil, errors.New("文件名非法")
+	}
 	dst, err := os.Create(storedPath)
 	if err != nil {
 		s.markFailed(file, "保存文件失败: "+err.Error())

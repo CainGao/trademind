@@ -11,6 +11,7 @@ package service
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -82,6 +83,47 @@ type CollectResult struct {
 	Message      string `json:"message"`
 }
 
+// 采集端点各字段最大长度（防超大输入导致 DB 膨胀，同 gotcha #58/#61/#64）。
+const (
+	maxCollectNameLen        = 500   // 商品名称
+	maxCollectDescLen        = 10000 // 商品描述
+	maxCollectURLLen         = 2000  // URL 字段
+	maxCollectCategoryLen    = 200   // 分类
+	maxCollectSourceIDLen    = 500   // 来源 ID
+	maxCollectSpecLen        = 500   // 规格说明
+	maxCollectImageURLCount  = 30    // 图片 URL 数量上限
+	maxCollectSupplierNameLen = 200  // 供应商名称
+)
+
+// validateCollectInput 校验采集输入的字段长度。
+func validateCollectInput(in *CollectProductInput) error {
+	if len(in.Name) > maxCollectNameLen {
+		return fmt.Errorf("商品名称过长（上限 %d 字符）", maxCollectNameLen)
+	}
+	if len(in.Description) > maxCollectDescLen {
+		return fmt.Errorf("商品描述过长（上限 %d 字符）", maxCollectDescLen)
+	}
+	if len(in.SourceURL) > maxCollectURLLen {
+		return fmt.Errorf("来源 URL 过长（上限 %d 字符）", maxCollectURLLen)
+	}
+	if len(in.Category) > maxCollectCategoryLen {
+		return fmt.Errorf("分类名称过长（上限 %d 字符）", maxCollectCategoryLen)
+	}
+	if len(in.SourceID) > maxCollectSourceIDLen {
+		return fmt.Errorf("来源 ID 过长（上限 %d 字符）", maxCollectSourceIDLen)
+	}
+	if len(in.PackageSpec) > maxCollectSpecLen {
+		return fmt.Errorf("规格说明过长（上限 %d 字符）", maxCollectSpecLen)
+	}
+	if len(in.ImageURLs) > maxCollectImageURLCount {
+		return fmt.Errorf("图片数量过多（上限 %d 张）", maxCollectImageURLCount)
+	}
+	if len(in.Supplier.Name) > maxCollectSupplierNameLen {
+		return fmt.Errorf("供应商名称过长（上限 %d 字符）", maxCollectSupplierNameLen)
+	}
+	return nil
+}
+
 // CollectProduct 接收插件采集的商品。
 // 策略：source + source_id 存在则更新可变字段，不存在则新建。
 func (s *ExtensionService) CollectProduct(userID uint, in CollectProductInput) (*CollectResult, error) {
@@ -90,6 +132,9 @@ func (s *ExtensionService) CollectProduct(userID uint, in CollectProductInput) (
 	}
 	if in.Source == "" {
 		return nil, errors.New("来源平台不能为空")
+	}
+	if err := validateCollectInput(&in); err != nil {
+		return nil, err
 	}
 
 	// 1. 先处理供应商（去重 upsert）
