@@ -17,12 +17,14 @@ package handler
 
 import (
 	"strconv"
+	"time"
 
 	"github.com/CainGao/trademind/internal/models"
 	"github.com/CainGao/trademind/internal/pkg/pagination"
 	"github.com/CainGao/trademind/internal/pkg/response"
 	"github.com/CainGao/trademind/internal/service"
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 // B2CHandler B2C 跨境电商端点。
@@ -58,6 +60,12 @@ func (h *B2CHandler) CreateStore(c *gin.Context) {
 		response.BadRequest(c, "参数错误: "+err.Error())
 		return
 	}
+	// 防止 mass assignment：清除客户端可能设置的内部字段
+	s.ID = 0
+	s.CreatedAt = time.Time{}
+	s.UpdatedAt = time.Time{}
+	s.DeletedAt = gorm.DeletedAt{}
+	s.CreatedBy = c.MustGet("user_id").(uint)
 	if err := h.svc.CreateStore(&s); err != nil {
 		response.InternalError(c, "创建失败: "+err.Error())
 		return
@@ -78,6 +86,9 @@ func (h *B2CHandler) UpdateStore(c *gin.Context) {
 		return
 	}
 	s.ID = uint(id)
+	// 防止 mass assignment：清除客户端可能篡改的审计字段
+	s.CreatedAt = time.Time{}
+	s.DeletedAt = gorm.DeletedAt{}
 	if err := h.svc.UpdateStore(&s); err != nil {
 		response.InternalError(c, "更新失败: "+err.Error())
 		return
@@ -123,6 +134,12 @@ func (h *B2CHandler) CreateListing(c *gin.Context) {
 		response.BadRequest(c, "参数错误: "+err.Error())
 		return
 	}
+	// 防止 mass assignment：清除客户端可能设置的内部字段
+	l.ID = 0
+	l.CreatedAt = time.Time{}
+	l.UpdatedAt = time.Time{}
+	l.DeletedAt = gorm.DeletedAt{}
+	l.CreatedBy = c.MustGet("user_id").(uint)
 	if err := h.svc.CreateListing(&l); err != nil {
 		response.InternalError(c, "创建失败: "+err.Error())
 		return
@@ -143,6 +160,9 @@ func (h *B2CHandler) UpdateListing(c *gin.Context) {
 		return
 	}
 	l.ID = uint(id)
+	// 防止 mass assignment：清除客户端可能篡改的审计字段
+	l.CreatedAt = time.Time{}
+	l.DeletedAt = gorm.DeletedAt{}
 	if err := h.svc.UpdateListing(&l); err != nil {
 		response.InternalError(c, "更新失败: "+err.Error())
 		return
@@ -189,6 +209,11 @@ func (h *B2CHandler) CreateOrder(c *gin.Context) {
 		response.BadRequest(c, "参数错误: "+err.Error())
 		return
 	}
+	// 防止 mass assignment：清除客户端可能设置的内部字段
+	o.ID = 0
+	o.CreatedAt = time.Time{}
+	o.UpdatedAt = time.Time{}
+	o.DeletedAt = gorm.DeletedAt{}
 	if err := h.svc.CreateOrder(&o); err != nil {
 		response.InternalError(c, "创建失败: "+err.Error())
 		return

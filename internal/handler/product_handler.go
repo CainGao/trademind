@@ -10,6 +10,7 @@
 package handler
 
 import (
+	"fmt"
 	"strconv"
 
 	"github.com/CainGao/trademind/internal/pkg/pagination"
@@ -24,6 +25,35 @@ type ProductHandler struct {
 
 func NewProductHandler(svc *service.ProductService) *ProductHandler {
 	return &ProductHandler{svc: svc}
+}
+
+// 商品输入字段长度上限（defense-in-depth，防止超长文本写入 DB）。
+const (
+	maxProductName     = 200    // 匹配 DB schema size:200
+	maxProductDesc     = 10000  // 10KB，商品描述
+	maxProductURL      = 2048   // 标准 URL 最大长度
+	maxProductImageURL = 10000  // 10KB，图片 URL JSON 数组
+	maxProductPkgSpec  = 200    // 匹配 DB schema size:200
+)
+
+// validateProductInput 校验商品输入字段长度。
+func validateProductInput(name, desc, sourceURL, imageUrls, pkgSpec string) error {
+	if len(name) > maxProductName {
+		return fmt.Errorf("商品名称过长（上限 %d 字符）", maxProductName)
+	}
+	if len(desc) > maxProductDesc {
+		return fmt.Errorf("商品描述过长（上限 %d 字符）", maxProductDesc)
+	}
+	if len(sourceURL) > maxProductURL {
+		return fmt.Errorf("来源 URL 过长（上限 %d 字符）", maxProductURL)
+	}
+	if len(imageUrls) > maxProductImageURL {
+		return fmt.Errorf("图片 URL 列表过长（上限 %d 字符）", maxProductImageURL)
+	}
+	if len(pkgSpec) > maxProductPkgSpec {
+		return fmt.Errorf("包装规格过长（上限 %d 字符）", maxProductPkgSpec)
+	}
+	return nil
 }
 
 func (h *ProductHandler) RegisterRoutes(r *gin.RouterGroup) {
@@ -41,6 +71,10 @@ func (h *ProductHandler) Create(c *gin.Context) {
 	var in service.CreateProductInput
 	if err := c.ShouldBindJSON(&in); err != nil {
 		response.BadRequest(c, "参数错误: "+err.Error())
+		return
+	}
+	if err := validateProductInput(in.Name, in.Description, in.SourceURL, in.ImageURLs, in.PackageSpec); err != nil {
+		response.BadRequest(c, err.Error())
 		return
 	}
 	in.CreatedBy = c.MustGet("user_id").(uint)
@@ -79,6 +113,29 @@ func (h *ProductHandler) Update(c *gin.Context) {
 	var in service.UpdateProductInput
 	if err := c.ShouldBindJSON(&in); err != nil {
 		response.BadRequest(c, "参数错误: "+err.Error())
+		return
+	}
+	// 校验提供的字段长度（指针字段非 nil 时校验）
+	if in.Name != nil {
+		if err := validateProductInput(*in.Name, "", "", "", ""); err != nil {
+			response.BadRequest(c, err.Error())
+			return
+		}
+	}
+	if in.Description != nil && len(*in.Description) > maxProductDesc {
+		response.BadRequest(c, fmt.Sprintf("商品描述过长（上限 %d 字符）", maxProductDesc))
+		return
+	}
+	if in.SourceURL != nil && len(*in.SourceURL) > maxProductURL {
+		response.BadRequest(c, fmt.Sprintf("来源 URL 过长（上限 %d 字符）", maxProductURL))
+		return
+	}
+	if in.ImageURLs != nil && len(*in.ImageURLs) > maxProductImageURL {
+		response.BadRequest(c, fmt.Sprintf("图片 URL 列表过长（上限 %d 字符）", maxProductImageURL))
+		return
+	}
+	if in.PackageSpec != nil && len(*in.PackageSpec) > maxProductPkgSpec {
+		response.BadRequest(c, fmt.Sprintf("包装规格过长（上限 %d 字符）", maxProductPkgSpec))
 		return
 	}
 	p, err := h.svc.Update(uint(id), in)
