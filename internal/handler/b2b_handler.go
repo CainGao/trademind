@@ -2,6 +2,7 @@
 package handler
 
 import (
+	"fmt"
 	"strconv"
 
 	"github.com/CainGao/trademind/internal/pkg/pagination"
@@ -9,6 +10,135 @@ import (
 	"github.com/CainGao/trademind/internal/service"
 	"github.com/gin-gonic/gin"
 )
+
+// B2B 输入字段长度上限（对齐 models/b2b.go 的 schema size 与业务合理值）。
+// 规则同 gotcha #61/#64/#69：所有接受用户文本输入的端点都必须设长度上限，
+// 防止 MB 级粘贴写入 SQLite TEXT 列导致 DB 膨胀。
+const (
+	maxCustomerCompanyName = 200   // 匹配 DB schema size:200
+	maxCustomerCountry     = 100   // size:100
+	maxCustomerContact     = 100   // size:100
+	maxCustomerEmail       = 200   // size:200
+	maxCustomerPhone       = 50    // size:50
+	maxCustomerWeChat      = 50    // size:50
+	maxCustomerDemand      = 10000 // type:text，10KB 需求描述
+
+	maxInquirySource      = 50    // alibaba|exhibition|email|website 等来源标识
+	maxInquiryProductDesc = 10000 // type:text，10KB 询价产品描述
+	maxInquiryDest        = 100   // size:100 目的港
+	maxInquiryPrice       = 50    // decimal 字符串形式
+
+	maxQuotationCurrency = 10     // size:3，留余量
+	maxQuotationAmount   = 50     // decimal 字符串形式
+	maxQuotationItems    = 100000 // type:text，100KB 报价明细 JSON
+)
+
+// checkLen 通用长度校验 helper：超长返回带字段名的错误。
+func checkLen(label, v string, max int) error {
+	if len(v) > max {
+		return fmt.Errorf("%s过长（上限 %d 字符）", label, max)
+	}
+	return nil
+}
+
+// validateCustomerInput 校验客户创建输入字段长度。
+func validateCustomerInput(in service.CreateCustomerInput) error {
+	for _, c := range []struct {
+		label string
+		val   string
+		max   int
+	}{
+		{"公司名称", in.CompanyName, maxCustomerCompanyName},
+		{"国家", in.Country, maxCustomerCountry},
+		{"联系人", in.ContactPerson, maxCustomerContact},
+		{"邮箱", in.Email, maxCustomerEmail},
+		{"电话", in.Phone, maxCustomerPhone},
+		{"微信", in.WeChat, maxCustomerWeChat},
+		{"需求描述", in.Demand, maxCustomerDemand},
+	} {
+		if err := checkLen(c.label, c.val, c.max); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// validateCustomerUpdateInput 校验客户更新输入（仅校验非 nil 指针字段）。
+func validateCustomerUpdateInput(in service.UpdateCustomerInput) error {
+	if in.CompanyName != nil {
+		if err := checkLen("公司名称", *in.CompanyName, maxCustomerCompanyName); err != nil {
+			return err
+		}
+	}
+	if in.Country != nil {
+		if err := checkLen("国家", *in.Country, maxCustomerCountry); err != nil {
+			return err
+		}
+	}
+	if in.ContactPerson != nil {
+		if err := checkLen("联系人", *in.ContactPerson, maxCustomerContact); err != nil {
+			return err
+		}
+	}
+	if in.Email != nil {
+		if err := checkLen("邮箱", *in.Email, maxCustomerEmail); err != nil {
+			return err
+		}
+	}
+	if in.Phone != nil {
+		if err := checkLen("电话", *in.Phone, maxCustomerPhone); err != nil {
+			return err
+		}
+	}
+	if in.WeChat != nil {
+		if err := checkLen("微信", *in.WeChat, maxCustomerWeChat); err != nil {
+			return err
+		}
+	}
+	if in.Demand != nil {
+		if err := checkLen("需求描述", *in.Demand, maxCustomerDemand); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// validateInquiryInput 校验询盘创建输入字段长度。
+func validateInquiryInput(in service.CreateInquiryInput) error {
+	for _, c := range []struct {
+		label string
+		val   string
+		max   int
+	}{
+		{"询盘来源", in.Source, maxInquirySource},
+		{"产品描述", in.ProductDesc, maxInquiryProductDesc},
+		{"目的港", in.Destination, maxInquiryDest},
+		{"目标价", in.TargetPrice, maxInquiryPrice},
+	} {
+		if err := checkLen(c.label, c.val, c.max); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// validateQuotationInput 校验报价单创建输入字段长度。
+func validateQuotationInput(in service.CreateQuotationInput) error {
+	for _, c := range []struct {
+		label string
+		val   string
+		max   int
+	}{
+		{"币种", in.Currency, maxQuotationCurrency},
+		{"总金额", in.TotalAmount, maxQuotationAmount},
+		{"报价明细", in.Items, maxQuotationItems},
+	} {
+		if err := checkLen(c.label, c.val, c.max); err != nil {
+			return err
+		}
+	}
+	return nil
+}
 
 type B2BHandler struct {
 	customerSvc  *service.CustomerService
@@ -66,6 +196,10 @@ func (h *B2BHandler) CreateCustomer(c *gin.Context) {
 		response.BadRequest(c, "参数错误: "+err.Error())
 		return
 	}
+	if err := validateCustomerInput(in); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
 	in.CreatedBy = c.MustGet("user_id").(uint)
 	cust, err := h.customerSvc.Create(in)
 	if err != nil {
@@ -92,6 +226,10 @@ func (h *B2BHandler) UpdateCustomer(c *gin.Context) {
 	var in service.UpdateCustomerInput
 	if err := c.ShouldBindJSON(&in); err != nil {
 		response.BadRequest(c, "参数错误: "+err.Error())
+		return
+	}
+	if err := validateCustomerUpdateInput(in); err != nil {
+		response.BadRequest(c, err.Error())
 		return
 	}
 	cust, err := h.customerSvc.Update(id, in)
@@ -133,6 +271,10 @@ func (h *B2BHandler) CreateInquiry(c *gin.Context) {
 	var in service.CreateInquiryInput
 	if err := c.ShouldBindJSON(&in); err != nil {
 		response.BadRequest(c, "参数错误: "+err.Error())
+		return
+	}
+	if err := validateInquiryInput(in); err != nil {
+		response.BadRequest(c, err.Error())
 		return
 	}
 	in.CreatedBy = c.MustGet("user_id").(uint)
@@ -185,6 +327,10 @@ func (h *B2BHandler) CreateQuotation(c *gin.Context) {
 	var in service.CreateQuotationInput
 	if err := c.ShouldBindJSON(&in); err != nil {
 		response.BadRequest(c, "参数错误: "+err.Error())
+		return
+	}
+	if err := validateQuotationInput(in); err != nil {
+		response.BadRequest(c, err.Error())
 		return
 	}
 	in.CreatedBy = c.MustGet("user_id").(uint)

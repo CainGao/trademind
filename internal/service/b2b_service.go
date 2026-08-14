@@ -3,6 +3,7 @@ package service
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -217,9 +218,19 @@ type CreateQuotationInput struct {
 	CreatedBy   uint   `json:"-"`
 }
 
+// maxQuotationValidDays 报价有效期上限（10 年）。防止 ValidDays=999999999 产生
+// 荒谬的 valid_until（如 2739933 年）脏数据。
+const maxQuotationValidDays = 3650
+
 func (s *QuotationService) Create(in CreateQuotationInput) (*models.Quotation, error) {
 	if in.Currency == "" {
 		in.Currency = "USD"
+	}
+	if in.ValidDays < 0 {
+		return nil, errors.New("有效期天数不能为负数")
+	}
+	if in.ValidDays > maxQuotationValidDays {
+		return nil, fmt.Errorf("有效期天数过长（上限 %d 天）", maxQuotationValidDays)
 	}
 	amount, err := decimal.NewFromString(in.TotalAmount)
 	if err != nil {
