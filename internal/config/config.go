@@ -45,7 +45,7 @@ type AppConfig struct {
 	Name        string `yaml:"name"`
 	Version     string `yaml:"version"`
 	RuntimeDir  string `yaml:"runtime_dir"`
-	Production  bool   `yaml:"production"`
+	Production  bool   `yaml:"production"` // 默认 true：私有化桌面部署即生产形态；开发时设 TRADEMIND_PRODUCTION=false
 }
 
 // Default 返回默认配置。
@@ -59,7 +59,7 @@ func Default() *Config {
 		},
 		App: AppConfig{
 			Name: "TradeMind AI", Version: AppVersion,
-			RuntimeDir: "runtime", Production: false,
+			RuntimeDir: "runtime", Production: true,
 		},
 	}
 }
@@ -95,6 +95,10 @@ func LoadFromPath(customPath string) (*Config, error) {
 	}
 	if v := os.Getenv("TRADEMIND_LOG_LEVEL"); v != "" {
 		cfg.Log.Level = v
+	}
+	// 生产模式开关：TRADEMIND_PRODUCTION=false/0 关闭（开发模式，Gin debug 日志）
+	if v := os.Getenv("TRADEMIND_PRODUCTION"); v != "" {
+		cfg.App.Production = v != "false" && v != "0"
 	}
 
 	// 确保运行时目录存在

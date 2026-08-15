@@ -28,6 +28,32 @@ func TestDefault(t *testing.T) {
 	if cfg.Log.Level == "" {
 		t.Error("Default log level should not be empty")
 	}
+	if !cfg.App.Production {
+		t.Error("Default production should be true (私有化桌面部署即生产形态)")
+	}
+}
+
+func TestLoad_EnvOverride_Production(t *testing.T) {
+	cases := []struct {
+		value  string
+		want   bool
+	}{
+		{"false", false},
+		{"0", false},
+		{"true", true},
+		{"1", true},
+	}
+	for _, tc := range cases {
+		os.Setenv("TRADEMIND_PRODUCTION", tc.value)
+		cfg, err := Load()
+		if err != nil {
+			t.Fatalf("Load() error with TRADEMIND_PRODUCTION=%s: %v", tc.value, err)
+		}
+		if cfg.App.Production != tc.want {
+			t.Errorf("TRADEMIND_PRODUCTION=%s → Production = %v, want %v", tc.value, cfg.App.Production, tc.want)
+		}
+	}
+	os.Unsetenv("TRADEMIND_PRODUCTION")
 }
 
 func TestLoad_Defaults(t *testing.T) {
