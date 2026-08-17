@@ -23,6 +23,8 @@ import DashboardPage from "./pages/dashboard/DashboardPage";
 import ProductList from "./pages/products/ProductList";
 import SupplierList from "./pages/suppliers/SupplierList";
 import CustomerList from "./pages/customers/CustomerList";
+import InquiryList from "./pages/inquiries/InquiryList";
+import QuotationList from "./pages/quotations/QuotationList";
 import Cockpit from "./pages/cockpit/Cockpit";
 import AgentList from "./pages/agents/AgentList";
 import SpecialAgents from "./pages/agents/SpecialAgents";
@@ -93,8 +95,8 @@ export default function App() {
               <Route path="products" element={<ProductList />} />
               <Route path="suppliers" element={<SupplierList />} />
               <Route path="customers" element={<CustomerList />} />
-              <Route path="inquiries" element={<Placeholder title="询盘管理（B2B）" />} />
-              <Route path="quotations" element={<Placeholder title="报价单（B2B）" />} />
+              <Route path="inquiries" element={<InquiryList />} />
+              <Route path="quotations" element={<QuotationList />} />
               <Route path="stores" element={<StoreList />} />
               <Route path="listings" element={<Placeholder title="上架商品（B2C）" />} />
               <Route path="orders" element={<OrderList />} />

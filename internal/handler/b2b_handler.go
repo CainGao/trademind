@@ -162,6 +162,7 @@ func (h *B2BHandler) RegisterRoutes(r *gin.RouterGroup) {
 	r.GET("/inquiries", h.ListInquiries)
 	r.POST("/inquiries", h.CreateInquiry)
 	r.GET("/inquiries/:id", h.GetInquiry)
+	r.PUT("/inquiries/:id", h.UpdateInquiry)
 	r.DELETE("/inquiries/:id", h.DeleteInquiry)
 
 	// 报价单
@@ -292,6 +293,51 @@ func (h *B2BHandler) GetInquiry(c *gin.Context) {
 	iq, err := h.inquirySvc.GetByID(id)
 	if err != nil {
 		response.NotFound(c, "询盘不存在")
+		return
+	}
+	response.Success(c, iq)
+}
+
+// validateInquiryUpdateInput 校验询盘更新输入字段长度（指针字段非 nil 时逐个校验，gotcha #70 同类）。
+func validateInquiryUpdateInput(in service.UpdateInquiryInput) error {
+	if in.Source != nil {
+		if err := checkLen("询盘来源", *in.Source, maxInquirySource); err != nil {
+			return err
+		}
+	}
+	if in.ProductDesc != nil {
+		if err := checkLen("产品描述", *in.ProductDesc, maxInquiryProductDesc); err != nil {
+			return err
+		}
+	}
+	if in.Destination != nil {
+		if err := checkLen("目的港", *in.Destination, maxInquiryDest); err != nil {
+			return err
+		}
+	}
+	if in.TargetPrice != nil {
+		if err := checkLen("目标价", *in.TargetPrice, maxInquiryPrice); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (h *B2BHandler) UpdateInquiry(c *gin.Context) {
+	id := parseID(c)
+	if id == 0 { return }
+	var in service.UpdateInquiryInput
+	if err := c.ShouldBindJSON(&in); err != nil {
+		response.BadRequest(c, "参数错误: "+err.Error())
+		return
+	}
+	if err := validateInquiryUpdateInput(in); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+	iq, err := h.inquirySvc.Update(id, in)
+	if err != nil {
+		response.BadRequest(c, err.Error())
 		return
 	}
 	response.Success(c, iq)

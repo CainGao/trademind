@@ -194,6 +194,59 @@ func (s *InquiryService) GetByID(id uint) (*models.Inquiry, error) {
 	return s.repo.FindByID(id)
 }
 
+// UpdateInquiryInput 询盘更新输入（指针字段，nil 表示不更新）。
+type UpdateInquiryInput struct {
+	CustomerID  *uint   `json:"customer_id,omitempty"`
+	Source      *string `json:"source,omitempty"`
+	ProductDesc *string `json:"product_desc,omitempty"`
+	Quantity    *int    `json:"quantity,omitempty"`
+	TargetPrice *string `json:"target_price,omitempty"`
+	Destination *string `json:"destination,omitempty"`
+	Status      *string `json:"status,omitempty"`
+}
+
+func (s *InquiryService) Update(id uint, in UpdateInquiryInput) (*models.Inquiry, error) {
+	iq, err := s.repo.FindByID(id)
+	if err != nil {
+		return nil, err
+	}
+	if in.CustomerID != nil {
+		iq.CustomerID = in.CustomerID
+	}
+	if in.Source != nil {
+		iq.Source = *in.Source
+	}
+	if in.ProductDesc != nil {
+		if strings.TrimSpace(*in.ProductDesc) == "" {
+			return nil, errors.New("询价产品描述不能为空")
+		}
+		iq.ProductDesc = *in.ProductDesc
+	}
+	if in.Quantity != nil {
+		iq.Quantity = in.Quantity
+	}
+	if in.TargetPrice != nil {
+		v, err := decimal.NewFromString(*in.TargetPrice)
+		if err != nil {
+			return nil, errors.New("目标价格式无效：" + *in.TargetPrice)
+		}
+		iq.TargetPrice = v
+	}
+	if in.Destination != nil {
+		iq.Destination = *in.Destination
+	}
+	if in.Status != nil {
+		if !validInquiryStatuses[*in.Status] {
+			return nil, errors.New("无效的询盘状态：" + *in.Status + "（允许: new/quoting/quoted/won/lost）")
+		}
+		iq.Status = *in.Status
+	}
+	if err := s.repo.Update(iq); err != nil {
+		return nil, err
+	}
+	return iq, nil
+}
+
 func (s *InquiryService) Delete(id uint) error {
 	return s.repo.SoftDelete(id)
 }

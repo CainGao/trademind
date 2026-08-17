@@ -59,7 +59,7 @@ export interface Inquiry {
   source: string;
   product_desc: string;
   quantity?: number;
-  target_price?: number;
+  target_price?: string; // decimal 序列化为字符串
   destination?: string;
   status: string;
   ai_analysis?: string;
@@ -75,12 +75,24 @@ export interface CreateInquiryInput {
   destination?: string;
 }
 
+export interface UpdateInquiryInput {
+  customer_id?: number;
+  source?: string;
+  product_desc?: string;
+  quantity?: number;
+  target_price?: string;
+  destination?: string;
+  status?: string;
+}
+
 export const inquiryApi = {
   list: (q: { page?: number; page_size?: number; source?: string; status?: string }) =>
     client.get<unknown, PageData<Inquiry>>("/inquiries", { params: q }),
   get: (id: number) => client.get<unknown, Inquiry>(`/inquiries/${id}`),
   create: (input: CreateInquiryInput) =>
     client.post<unknown, Inquiry>("/inquiries", input),
+  update: (id: number, input: UpdateInquiryInput) =>
+    client.put<unknown, Inquiry>(`/inquiries/${id}`, input),
   delete: (id: number) =>
     client.delete<unknown, { deleted: boolean }>(`/inquiries/${id}`),
 };
@@ -92,7 +104,7 @@ export interface Quotation {
   inquiry_id?: number;
   customer_id?: number;
   currency: string;
-  total_amount: number;
+  total_amount: string; // decimal 序列化为字符串
   status: string;
   valid_until?: string;
   items?: string;
