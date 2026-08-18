@@ -22,6 +22,8 @@ export interface CreateStoreInput {
 }
 
 // ===== 上架 =====
+// 注意：selling_price 是 shopspring/decimal 的字符串序列化（gotcha #20），
+// 表单 InputNumber 得到 number，保存边界需 String() / Number() 转换。
 export interface Listing {
   id: number;
   store_id: number;
@@ -31,7 +33,7 @@ export interface Listing {
   title: string;
   status: string;
   listing_url?: string;
-  selling_price: number;
+  selling_price: string | number;
   currency: string;
   stock?: number;
   published_at?: string;
@@ -103,6 +105,9 @@ export const b2cApi = {
   },
   updateListing(id: number, data: Partial<Listing>) {
     return client.put<unknown, Listing>(`/b2c/listings/${id}`, data);
+  },
+  deleteListing(id: number) {
+    return client.delete<unknown, { deleted: boolean }>(`/b2c/listings/${id}`);
   },
 
   // 订单

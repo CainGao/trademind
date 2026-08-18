@@ -30,10 +30,10 @@ import AgentList from "./pages/agents/AgentList";
 import SpecialAgents from "./pages/agents/SpecialAgents";
 import DailyReports from "./pages/reports/DailyReports";
 import StoreList from "./pages/stores/StoreList";
+import ListingList from "./pages/listings/ListingList";
 import OrderList from "./pages/orders/OrderList";
 import Knowledge from "./pages/knowledge/Knowledge";
 import SettingsPage from "./pages/system/SettingsPage";
-import Placeholder from "./components/Placeholder";
 
 // 需登录的路由守卫
 function PrivateRoute({ children }: { children: React.ReactNode }) {
@@ -98,7 +98,7 @@ export default function App() {
               <Route path="inquiries" element={<InquiryList />} />
               <Route path="quotations" element={<QuotationList />} />
               <Route path="stores" element={<StoreList />} />
-              <Route path="listings" element={<Placeholder title="上架商品（B2C）" />} />
+              <Route path="listings" element={<ListingList />} />
               <Route path="orders" element={<OrderList />} />
               <Route path="agents" element={<AgentList />} />
               <Route path="agents-special" element={<SpecialAgents />} />
