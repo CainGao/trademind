@@ -7,8 +7,10 @@ package database
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/CainGao/trademind/internal/models"
 	"github.com/glebarez/sqlite"
@@ -29,7 +31,17 @@ func Open(cfg Config) (*gorm.DB, error) {
 	}
 
 	db, err := gorm.Open(sqlite.Open(cfg.Path), &gorm.Config{
-		Logger: logger.Default.LogMode(logger.Warn),
+		// ErrRecordNotFoundError 是业务常态（如首次启动 settings 表无 cron 配置、
+		// LatestByType 无记录），不应作为错误刷日志。调用方仍会收到 error 正常处理，
+		// 这里只是抑制 GORM logger 把它当 SQL 错误打印（启动噪音）。
+		Logger: logger.New(
+			log.New(os.Stdout, "\r\n", log.LstdFlags),
+			logger.Config{
+				SlowThreshold:             200 * time.Millisecond,
+				LogLevel:                  logger.Warn,
+				IgnoreRecordNotFoundError: true,
+			},
+		),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("打开数据库失败 [path=%s]: %w", cfg.Path, err)

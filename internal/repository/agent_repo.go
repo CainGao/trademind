@@ -7,6 +7,8 @@
 package repository
 
 import (
+	"time"
+
 	"github.com/CainGao/trademind/internal/models"
 	"gorm.io/gorm"
 )
@@ -63,4 +65,19 @@ func (r *AgentRepo) LatestByType(agentType string) (*models.AgentRun, error) {
 		return nil, err
 	}
 	return &run, nil
+}
+
+// CleanupZombieRuns 把所有 status=running 的运行记录标记为 failed（进程启动时调用）。
+// 进程重启/崩溃时正在执行的 Agent goroutine 已消失，其运行记录会永久卡在 running
+// 状态（僵尸记录）。启动时统一收敛为 failed + 补记 finished_at，保证状态机闭合。
+// 返回受影响行数。
+func (r *AgentRepo) CleanupZombieRuns() (int64, error) {
+	res := r.DB.Model(&models.AgentRun{}).
+		Where("status = ?", models.AgentRunRunning).
+		Updates(map[string]interface{}{
+			"status":      models.AgentRunFailed,
+			"output":      "进程重启，任务中断",
+			"finished_at": time.Now(),
+		})
+	return res.RowsAffected, res.Error
 }

@@ -13,6 +13,7 @@ package service
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
@@ -265,12 +266,14 @@ func buildSelectionPrompt(days int, topKeywords, byType []map[string]interface{}
 
 	b.WriteString("## Top 搜索关键词\n")
 	for i, kw := range topKeywords {
-		b.WriteString(fmt.Sprintf("%d. %v（%v 次）\n", i+1, kw["keyword"], kw["count"]))
+		// 聚合查询别名为 cnt（behavior_repo.TopKeywords），缺失时兜底 0，绝不打印 <nil>
+		b.WriteString(fmt.Sprintf("%d. %v（%s 次）\n", i+1, kw["keyword"], fmtCount(kw["cnt"])))
 	}
 
 	b.WriteString("\n## 行为分布\n")
 	for _, t := range byType {
-		b.WriteString(fmt.Sprintf("- %v: %v 次\n", t["event_type"], t["count"]))
+		// 聚合查询别名为 cnt（behavior_repo.StatsByType），缺失时兜底 0
+		b.WriteString(fmt.Sprintf("- %v: %s 次\n", t["event_type"], fmtCount(t["cnt"])))
 	}
 
 	b.WriteString(fmt.Sprintf("\n## 现有商品库（共 %d 个样本）\n", len(products)))
@@ -373,8 +376,9 @@ func buildSourcingPrompt(products []models.Product, supOv *repository.SupplierOv
 		if i >= 15 {
 			break
 		}
-		b.WriteString(fmt.Sprintf("- %s | 采购价: %s %s | 供应商ID: %v | AI评分: %s\n",
-			p.Name, p.PurchasePrice, p.PurchaseCurrency, p.SupplierID, p.AIScore))
+		// SupplierID 是 *uint，直接 %v 会打印内存地址（0x1400...），必须解引用
+		b.WriteString(fmt.Sprintf("- %s | 采购价: %s %s | 供应商ID: %s | AI评分: %s\n",
+			p.Name, p.PurchasePrice, p.PurchaseCurrency, fmtSupplierID(p.SupplierID), p.AIScore))
 	}
 	if supOv != nil {
 		b.WriteString(fmt.Sprintf("\n# 供应商概览\n- 总数: %d\n- 高风险: %d\n- 中风险: %d\n- 低风险: %d\n",
@@ -382,4 +386,36 @@ func buildSourcingPrompt(products []models.Product, supOv *repository.SupplierOv
 	}
 	b.WriteString("\n请基于以上数据，给出采购建议。")
 	return b.String()
+}
+
+// fmtCount 聚合查询计数值格式化：nil 值（key 不存在或 SQL NULL）兜底为 "0"，
+// 绝不把 <nil> 打进 AI prompt（AI 会把它当异常数据）。
+func fmtCount(v interface{}) string {
+	if v == nil {
+		return "0"
+	}
+	return fmt.Sprintf("%v", v)
+}
+
+// fmtSupplierID 主供应商 ID 格式化：*uint 直接 %v 会打印内存地址（0x140005e43b0），
+// 既泄露内存布局又对 AI 毫无意义。nil → "无"，非 nil → 数字。
+func fmtSupplierID(p *uint) string {
+	if p == nil {
+		return "无"
+	}
+	return fmt.Sprintf("%d", *p)
+}
+
+// CleanupZombieRuns 清理僵尸运行记录（进程启动时调用一次）。
+// 进程重启/崩溃时正在执行的 Agent 运行会永久卡在 running 状态（goroutine 已消失），
+// 启动时统一标记为 failed，避免 agent_runs 出现永不结束的僵尸记录（gotcha #30 的遗留面）。
+func (s *AgentService) CleanupZombieRuns() {
+	n, err := s.agentRepo.CleanupZombieRuns()
+	if err != nil {
+		log.Printf("[agent] 僵尸运行记录清理失败: %v", err)
+		return
+	}
+	if n > 0 {
+		log.Printf("[agent] 已清理 %d 条僵尸运行记录（上次进程退出时中断的任务）", n)
+	}
 }

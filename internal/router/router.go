@@ -138,6 +138,9 @@ func New(cfg *config.Config, db *gorm.DB) (*gin.Engine, *service.SchedulerServic
 				log.Printf("[router] 调度器启动 panic（已恢复）: %v", r)
 			}
 		}()
+		// 先清理上次进程退出时遗留的僵尸 running 记录（仅在进程启动路径执行，
+		// Restart 修改定时配置时不经过这里，不会误杀真正在运行的任务）
+		agentSvc.CleanupZombieRuns()
 		if err := schedSvc.Start(); err != nil {
 			// 调度器启动失败不阻塞 HTTP 服务，只记录日志
 			_ = err // log 会在 scheduler_service.go 里打
