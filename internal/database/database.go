@@ -57,6 +57,15 @@ func Open(cfg Config) (*gorm.DB, error) {
 	// WAL 模式（提升并发读）
 	db.Exec("PRAGMA journal_mode = WAL")
 
+	// WAL 自愈（gotcha #81）：上个会话若被强杀（SIGKILL/断电/直接关机），
+	// 优雅关闭（gotcha #49）没有机会执行，-wal 文件会残留并跨会话无限增长
+	// （实测 8 周每日 pkill -9 重启后 wal 达 4MB，比主库还大）。
+	// 启动时强制 TRUNCATE checkpoint：把残留 WAL 帧刷入主库并将 wal 截断为 0，
+	// 保证 WAL 尺寸只受单次会话影响。checkpoint 失败（临时 busy 等）不阻塞启动。
+	if res := db.Exec("PRAGMA wal_checkpoint(TRUNCATE)"); res.Error != nil {
+		log.Printf("[database] 启动 WAL checkpoint 失败（不阻塞启动）: %v", res.Error)
+	}
+
 	return db, nil
 }
 
