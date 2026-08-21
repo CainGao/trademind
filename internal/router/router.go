@@ -174,6 +174,11 @@ func New(cfg *config.Config, db *gorm.DB) (*gin.Engine, *service.SchedulerServic
 		// 首启向导写操作
 		setupHandler.RegisterRoutes(protected)
 
+		// 用户注册（gotcha #82：从公开组移入，需 JWT + admin）
+		authAdmin := protected.Group("/auth")
+		authAdmin.Use(middleware.RequireRole(models.RoleAdmin))
+		authHandler.RegisterAdminRoutes(authAdmin)
+
 		// 当前用户
 		protected.GET("/me", authHandler.Me)
 

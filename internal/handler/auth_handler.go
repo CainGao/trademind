@@ -28,11 +28,18 @@ func NewAuthHandler(svc *service.AuthService, limiter *middleware.LoginLimiter) 
 	return &AuthHandler{svc: svc, limiter: limiter}
 }
 
-// RegisterRoutes 注册 /auth/* 路由（公开）。
+// RegisterRoutes 注册公开认证路由（仅 login/refresh）。
+// ⚠️ register 不在此处：未认证请求绝不能创建账号（尤其 admin），见 RegisterAdminRoutes。
 func (h *AuthHandler) RegisterRoutes(r *gin.RouterGroup) {
 	r.POST("/login", h.Login)
-	r.POST("/register", h.Register)
 	r.POST("/refresh", h.Refresh)
+}
+
+// RegisterAdminRoutes 注册受保护的用户管理路由。
+// 调用方必须挂在 JWT + RequireRole(RoleAdmin) 中间件之后（router.go 装配）。
+// POST /api/auth/register（gotcha #82：原公开注册 + 可指定 role=admin = 越权漏洞）
+func (h *AuthHandler) RegisterAdminRoutes(r *gin.RouterGroup) {
+	r.POST("/register", h.Register)
 }
 
 // Login 登录。
