@@ -18,6 +18,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"path/filepath"
 	"sort"
@@ -49,6 +50,13 @@ const manifestName = "manifest.json"
 // 数据库文件在 zip 内的固定名称（恢复时按此查找）。
 const zipDBName = "trademind.db"
 
+// 手动备份文件名前缀（用户在设置页点「立即备份」生成）。
+const backupPrefix = "trademind-backup-"
+
+// 自动备份文件名前缀（调度器每日生成）。与手动前缀区分开，
+// 保留策略（PruneAutoBackups）只清理自动备份，手动备份永不自动删除。
+const autoBackupPrefix = "trademind-auto-"
+
 // BackupService 数据备份/恢复业务逻辑。
 type BackupService struct {
 	db         *gorm.DB
@@ -64,12 +72,22 @@ func NewBackupService(db *gorm.DB, backupsDir, filesDir, version string) *Backup
 
 // Create 生成一份完整备份（DB 快照 + 附件），返回元信息。
 func (s *BackupService) Create() (*BackupInfo, error) {
+	return s.createNamed(backupPrefix)
+}
+
+// CreateAuto 生成一份自动备份（与手动备份内容相同，仅文件名前缀不同）。
+func (s *BackupService) CreateAuto() (*BackupInfo, error) {
+	return s.createNamed(autoBackupPrefix)
+}
+
+// createNamed 备份实现：prefix 决定文件名前缀（手动/自动）。
+func (s *BackupService) createNamed(prefix string) (*BackupInfo, error) {
 	if err := os.MkdirAll(s.backupsDir, 0755); err != nil {
 		return nil, fmt.Errorf("创建备份目录失败: %w", err)
 	}
 
 	// 1. 生成不冲突的 zip 文件名（人类可读时间戳）
-	zipName := s.uniqueName()
+	zipName := s.uniqueName(prefix)
 	zipPath := filepath.Join(s.backupsDir, zipName)
 
 	// 2. VACUUM INTO 临时快照（内部路径，非用户输入，安全）
@@ -180,9 +198,9 @@ func addFileToZip(zw *zip.Writer, src, arcName string) error {
 	return err
 }
 
-// uniqueName 生成不冲突的备份文件名 trademind-backup-YYYYMMDD-HHMMSS.zip。
-func (s *BackupService) uniqueName() string {
-	base := "trademind-backup-" + time.Now().Format("20060102-150405")
+// uniqueName 生成不冲突的备份文件名 <prefix>YYYYMMDD-HHMMSS.zip。
+func (s *BackupService) uniqueName(prefix string) string {
+	base := prefix + time.Now().Format("20060102-150405")
 	name := base + ".zip"
 	for i := 2; ; i++ {
 		if _, err := os.Stat(filepath.Join(s.backupsDir, name)); os.IsNotExist(err) {
@@ -225,6 +243,58 @@ func (s *BackupService) List() ([]BackupInfo, error) {
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].CreatedAt.After(out[j].CreatedAt) })
 	return out, nil
+}
+
+// PruneAutoBackups 保留策略：删除「自动备份」中修改时间早于 retentionDays 天前的文件。
+// 手动备份（trademind-backup-*）永不自动删除——那是老板亲手点的。
+// retentionDays <= 0 视为删除全部自动备份。返回删除的文件数。
+func (s *BackupService) PruneAutoBackups(retentionDays int) (int, error) {
+	entries, err := os.ReadDir(s.backupsDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return 0, nil // 目录都没有，无事可做
+		}
+		return 0, fmt.Errorf("读取备份目录失败: %w", err)
+	}
+	if retentionDays < 0 {
+		retentionDays = 0
+	}
+	cutoff := time.Now().AddDate(0, 0, -retentionDays)
+	pruned := 0
+	for _, e := range entries {
+		name := e.Name()
+		if e.IsDir() || !strings.HasPrefix(name, autoBackupPrefix) || !strings.HasSuffix(name, ".zip") {
+			continue
+		}
+		fi, err := e.Info()
+		if err != nil {
+			continue // 单个文件 stat 失败跳过，不阻塞整体清理
+		}
+		if fi.ModTime().Before(cutoff) {
+			if err := os.Remove(filepath.Join(s.backupsDir, name)); err != nil {
+				log.Printf("[backup] 清理过期自动备份失败 [%s]: %v", name, err)
+				continue
+			}
+			pruned++
+		}
+	}
+	return pruned, nil
+}
+
+// LatestAutoBackup 返回最新一份自动备份。没有自动备份时 ok=false。
+// 调度器启动时用它判断是否需要补跑（桌面应用深夜大概率没开机，cron 常漏跑）。
+func (s *BackupService) LatestAutoBackup() (BackupInfo, bool, error) {
+	list, err := s.List()
+	if err != nil {
+		return BackupInfo{}, false, err
+	}
+	// List 已按时间倒序，取第一个自动备份即可
+	for _, b := range list {
+		if strings.HasPrefix(b.Filename, autoBackupPrefix) {
+			return b, true, nil
+		}
+	}
+	return BackupInfo{}, false, nil
 }
 
 // Path 返回备份文件的绝对路径。filename 必须是纯文件名（防目录穿越）。

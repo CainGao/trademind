@@ -112,6 +112,8 @@ func New(cfg *config.Config, db *gorm.DB) (*gin.Engine, *service.SchedulerServic
 	// 数据备份/恢复（数据安全）：备份存 runtime/backups/
 	backupsDir := filepath.Join(cfg.App.RuntimeDir, "backups")
 	backupSvc := service.NewBackupService(db, backupsDir, filesDir, cfg.App.Version)
+	// 把备份服务注入调度器（每天 2:00 自动备份 + 启动补跑 + 14 天保留策略）
+	schedSvc.SetBackupService(backupSvc)
 
 	// Handler
 	loginLimiter := middleware.DefaultLoginLimiter()

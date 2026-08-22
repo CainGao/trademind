@@ -13,7 +13,9 @@ package service
 import (
 	"fmt"
 	"log"
+	"strconv"
 	"sync"
+	"time"
 
 	"github.com/CainGao/trademind/internal/models"
 	"github.com/CainGao/trademind/internal/repository"
@@ -28,6 +30,7 @@ type SchedulerService struct {
 	setting        *repository.SettingRepo
 	schedule       map[models.AgentType]string // 当前生效的 cron 表达式
 	dailyReportSvc *DailyReportService         // 日报服务（可选，延迟注入）
+	backupSvc      *BackupService              // 备份服务（可选，延迟注入）
 }
 
 // NewSchedulerService 构造（不立即启动）。
@@ -42,6 +45,40 @@ func NewSchedulerService(agentSvc *AgentService, setting *repository.SettingRepo
 // SetDailyReportService 延迟注入日报服务（避免 router 装配循环依赖）。
 func (s *SchedulerService) SetDailyReportService(svc *DailyReportService) {
 	s.dailyReportSvc = svc
+}
+
+// SetBackupService 延迟注入备份服务（避免 router 装配循环依赖，同 SetDailyReportService 模式）。
+func (s *SchedulerService) SetBackupService(svc *BackupService) {
+	s.backupSvc = svc
+}
+
+// 每日自动备份默认配置（settings 表可覆盖）。
+const (
+	defaultBackupCron         = "0 2 * * *"  // 每天凌晨 2:00
+	defaultBackupRetentionDay = 14           // 自动备份保留 14 天
+	backupCatchUpThreshold    = 20 * time.Hour // 超过 20h 没有自动备份就补跑（桌面应用深夜常没开机，cron 会漏）
+)
+
+// getBackupCron 备份 cron 表达式（settings: backup_cron，缺省/非法回退默认）。
+func (s *SchedulerService) getBackupCron() string {
+	if v, err := s.setting.Get("backup_cron"); err == nil && v != nil && v.Value != "" {
+		if _, err := cron.ParseStandard(v.Value); err == nil {
+			return v.Value
+		}
+		log.Printf("[scheduler] backup_cron 配置非法（%q），回退默认 %s", v.Value, defaultBackupCron)
+	}
+	return defaultBackupCron
+}
+
+// getBackupRetentionDays 自动备份保留天数（settings: backup_retention_days，缺省/非法回退默认）。
+func (s *SchedulerService) getBackupRetentionDays() int {
+	if v, err := s.setting.Get("backup_retention_days"); err == nil && v != nil && v.Value != "" {
+		if n, err := strconv.Atoi(v.Value); err == nil && n >= 0 {
+			return n
+		}
+		log.Printf("[scheduler] backup_retention_days 配置非法（%q），回退默认 %d", v.Value, defaultBackupRetentionDay)
+	}
+	return defaultBackupRetentionDay
 }
 
 // DefaultSchedule 默认定时（settings 表无值时用）。
@@ -160,9 +197,62 @@ func (s *SchedulerService) Start() error {
 		log.Println("[scheduler] 已注册 report | cron=0 18 * * * (每天 18:00)")
 	}
 
+	// 注册每日自动备份任务（默认凌晨 2:00），仅当注入了 backupSvc。
+	// 数据安全是私有化部署的核心承诺——唯一一份备份躺在那里一个月没更新过，
+	// 磁盘一坏整月数据蒸发。自动备份 + 保留策略让老板无感享受数据安全。
+	if s.backupSvc != nil {
+		backupCron := s.getBackupCron()
+		if _, err := s.cron.AddFunc(backupCron, func() {
+			defer func() {
+				if r := recover(); r != nil {
+					log.Printf("[scheduler] 备份任务 panic（已恢复）: %v", r)
+				}
+			}()
+			s.runBackup("定时触发")
+		}); err != nil {
+			return fmt.Errorf("注册备份任务失败: %w", err)
+		}
+		log.Printf("[scheduler] 已注册 backup | cron=%s | 保留 %d 天", backupCron, s.getBackupRetentionDays())
+
+		// 启动补跑：桌面应用深夜大概率没开机，凌晨 cron 常年漏跑。
+		// 若最近一份自动备份已超过阈值（默认 20h），启动时立即补一份。
+		// 异步执行，不阻塞调度器启动（gotcha #65：go func 必须可 recover，runBackup 内置）。
+		go func() {
+			defer func() {
+				if r := recover(); r != nil {
+					log.Printf("[scheduler] 备份补跑 panic（已恢复）: %v", r)
+				}
+			}()
+			if latest, ok, err := s.backupSvc.LatestAutoBackup(); err != nil {
+				log.Printf("[scheduler] 检查自动备份状态失败: %v", err)
+			} else if !ok || time.Since(latest.CreatedAt) > backupCatchUpThreshold {
+				s.runBackup("启动补跑")
+			}
+		}()
+	}
+
 	s.cron.Start()
 	log.Println("[scheduler] 定时调度器已启动")
 	return nil
+}
+
+// runBackup 执行一次自动备份 + 保留策略清理。panic/error 只 log（gotcha #42/#62）。
+func (s *SchedulerService) runBackup(trigger string) {
+	retention := s.getBackupRetentionDays()
+	info, err := s.backupSvc.CreateAuto()
+	if err != nil {
+		log.Printf("[scheduler] 自动备份失败（%s）: %v", trigger, err)
+		return
+	}
+	log.Printf("[scheduler] 自动备份完成（%s）: %s (%d bytes)", trigger, info.Filename, info.Size)
+	pruned, err := s.backupSvc.PruneAutoBackups(retention)
+	if err != nil {
+		log.Printf("[scheduler] 清理过期备份失败: %v", err)
+		return
+	}
+	if pruned > 0 {
+		log.Printf("[scheduler] 已清理 %d 份过期自动备份（保留 %d 天）", pruned, retention)
+	}
 }
 
 // register 注册单个 Agent 的 cron 任务。
