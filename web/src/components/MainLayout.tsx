@@ -14,6 +14,7 @@ import {
   TeamOutlined,
   RobotOutlined,
   SettingOutlined,
+  FileSearchOutlined,
   FundOutlined,
   LogoutOutlined,
   DownOutlined,
@@ -68,6 +69,7 @@ const allMenuItems: AppMenuItem[] = [
   { key: "knowledge", icon: <BookOutlined />, label: "RAG 知识库", roles: ["admin", "boss"] },
   { key: "cockpit", icon: <DashboardOutlined />, label: "老板驾驶舱", roles: ["admin", "boss"] },
   { key: "settings", icon: <SettingOutlined />, label: "系统设置", roles: ["admin"] },
+  { key: "audit-logs", icon: <FileSearchOutlined />, label: "审计日志", roles: ["admin"] },
 ];
 
 // 按角色过滤，转换为 AntD Menu 的 props.items 格式

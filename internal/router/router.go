@@ -114,6 +114,8 @@ func New(cfg *config.Config, db *gorm.DB) (*gin.Engine, *service.SchedulerServic
 	backupSvc := service.NewBackupService(db, backupsDir, filesDir, cfg.App.Version)
 	// 把备份服务注入调度器（每天 2:00 自动备份 + 启动补跑 + 14 天保留策略）
 	schedSvc.SetBackupService(backupSvc)
+	// 审计日志查看（管理员合规功能）
+	auditSvc := service.NewAuditService(auditRepo, userRepo)
 
 	// Handler
 	loginLimiter := middleware.DefaultLoginLimiter()
@@ -246,6 +248,10 @@ func New(cfg *config.Config, db *gorm.DB) (*gin.Engine, *service.SchedulerServic
 		backupAdmin := protected.Group("")
 		backupAdmin.Use(middleware.RequireRole(models.RoleAdmin))
 		backupHandler.RegisterRoutes(backupAdmin)
+
+		// 审计日志（管理员）：敏感操作记录查看
+		auditHandler := handler.NewAuditHandler(auditSvc)
+		auditHandler.RegisterRoutes(backupAdmin)
 
 		// Chrome 插件对接（采集 / 行为 / 状态）
 		extensionHandler.RegisterRoutes(protected)

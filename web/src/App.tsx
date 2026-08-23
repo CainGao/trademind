@@ -34,6 +34,7 @@ import ListingList from "./pages/listings/ListingList";
 import OrderList from "./pages/orders/OrderList";
 import Knowledge from "./pages/knowledge/Knowledge";
 import SettingsPage from "./pages/system/SettingsPage";
+import AuditLogs from "./pages/system/AuditLogs";
 
 // 需登录的路由守卫
 function PrivateRoute({ children }: { children: React.ReactNode }) {
@@ -106,6 +107,7 @@ export default function App() {
               <Route path="knowledge" element={<Knowledge />} />
               <Route path="cockpit" element={<Cockpit />} />
               <Route path="settings" element={<SettingsPage />} />
+              <Route path="audit-logs" element={<AuditLogs />} />
               <Route path="*" element={<Navigate to="/dashboard" replace />} />
             </Route>
           </Routes>
