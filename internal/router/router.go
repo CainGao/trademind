@@ -175,8 +175,11 @@ func New(cfg *config.Config, db *gorm.DB) (*gin.Engine, *service.SchedulerServic
 	protected.Use(middleware.JWT(jwtMgr))
 	protected.Use(middleware.SetupGuard(setupSvc))
 	{
-		// 首启向导写操作
-		setupHandler.RegisterRoutes(protected)
+		// 首启向导写操作（gotcha #87：设计文档声明 JWT+Admin，此前只挂了 JWT——
+		// staff 角色可越权覆盖 AI Key/场景/企业信息等全局配置，补 RequireRole）
+		setupAdmin := protected.Group("")
+		setupAdmin.Use(middleware.RequireRole(models.RoleAdmin))
+		setupHandler.RegisterRoutes(setupAdmin)
 
 		// 用户注册（gotcha #82：从公开组移入，需 JWT + admin）
 		authAdmin := protected.Group("/auth")
