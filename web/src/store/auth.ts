@@ -10,6 +10,8 @@ interface AuthState {
   refreshToken: string | null;
   user: UserInfo | null;
   expiresAt: string | null;
+  /** admin 仍在使用默认密码（登录时后端检测，gotcha #88） */
+  mustChangePassword: boolean;
 
   setTokens: (data: {
     access_token: string;
@@ -17,6 +19,8 @@ interface AuthState {
     expires_at: string;
     user: UserInfo;
   }) => void;
+  /** 改密成功后清除提醒标志 */
+  clearMustChangePassword: () => void;
   logout: () => void;
   isAuthenticated: () => boolean;
 }
@@ -28,6 +32,7 @@ export const useAuthStore = create<AuthState>()(
       refreshToken: null,
       user: null,
       expiresAt: null,
+      mustChangePassword: false,
 
       setTokens: (data) =>
         set({
@@ -35,7 +40,10 @@ export const useAuthStore = create<AuthState>()(
           refreshToken: data.refresh_token,
           expiresAt: data.expires_at,
           user: data.user,
+          mustChangePassword: !!data.user.must_change_password,
         }),
+
+      clearMustChangePassword: () => set({ mustChangePassword: false }),
 
       logout: () =>
         set({
@@ -43,6 +51,7 @@ export const useAuthStore = create<AuthState>()(
           refreshToken: null,
           expiresAt: null,
           user: null,
+          mustChangePassword: false,
         }),
 
       isAuthenticated: () => {

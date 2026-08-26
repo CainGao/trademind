@@ -102,6 +102,10 @@ func (h *AuthHandler) Register(c *gin.Context) {
 			response.Conflict(c, err.Error())
 			return
 		}
+		if errors.Is(err, service.ErrWeakPassword) {
+			response.BadRequest(c, err.Error())
+			return
+		}
 		response.InternalError(c, "注册失败")
 		return
 	}

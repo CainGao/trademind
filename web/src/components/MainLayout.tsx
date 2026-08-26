@@ -4,7 +4,7 @@
 // 架构文档 §1.2: 五角色适配两场景。
 
 import { useState } from "react";
-import { Layout, Menu, Avatar, Dropdown, Typography, Space } from "antd";
+import { Layout, Menu, Avatar, Dropdown, Typography, Space, Alert, Button } from "antd";
 import type { MenuProps } from "antd";
 import {
   DashboardOutlined,
@@ -93,7 +93,9 @@ export default function MainLayout() {
   const [collapsed, setCollapsed] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, logout } = useAuthStore();
+  const { user, logout, mustChangePassword } = useAuthStore();
+  // 横幅可手动关闭（仅本次会话提醒），下次登录若仍未改密会再出现
+  const [pwdBannerOpen, setPwdBannerOpen] = useState(true);
 
   // 按角色过滤菜单
   const menuItems = buildMenuItems(allMenuItems, user?.role);
@@ -161,6 +163,22 @@ export default function MainLayout() {
       </Sider>
 
       <Layout>
+        {mustChangePassword && pwdBannerOpen && (
+          <Alert
+            type="warning"
+            showIcon
+            closable
+            onClose={() => setPwdBannerOpen(false)}
+            message="安全提醒：当前管理员仍在使用默认密码"
+            description="默认密码存在安全风险，且已进入系统弱密码黑名单（改密后不可再改回）。建议立即前往系统设置修改密码。"
+            action={
+              <Button size="small" type="primary" onClick={() => navigate("/settings")}>
+                前往修改
+              </Button>
+            }
+            style={{ marginBottom: 0 }}
+          />
+        )}
         <Header
           style={{
             background: "#fff",

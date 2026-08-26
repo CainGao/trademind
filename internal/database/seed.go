@@ -46,6 +46,11 @@ func seedJWTSecret(db *gorm.DB) error {
 	}).Error
 }
 
+// DefaultAdminPassword 首启 seed 的默认管理员密码。
+// 导出供 auth 层做「仍在使用默认密码」检测（改密提醒横幅），
+// 避免魔法字符串在 seed/auth 两处重复后失同步。
+const DefaultAdminPassword = "admin123"
+
 // seedAdmin 默认管理员（用户名 admin，密码 admin123，首次登录强制改）。
 func seedAdmin(db *gorm.DB) error {
 	var count int64
@@ -53,7 +58,7 @@ func seedAdmin(db *gorm.DB) error {
 	if count > 0 {
 		return nil // 已有用户，跳过
 	}
-	hash, err := crypto.HashPassword("admin123")
+	hash, err := crypto.HashPassword(DefaultAdminPassword)
 	if err != nil {
 		return err
 	}

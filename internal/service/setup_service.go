@@ -306,6 +306,14 @@ type ChangePasswordInput struct {
 
 // ChangePassword 修改管理员密码（规范 §6.1: bcrypt cost=12）。
 func (s *SetupService) ChangePassword(userID uint, input ChangePasswordInput) error {
+	// 新旧密码不得相同（防「改了个寂寞」绕过默认密码治理，gotcha #88）
+	if input.NewPassword == input.OldPassword {
+		return errors.New("新密码不能与原密码相同")
+	}
+	// 弱密码黑名单拦截（防把密码改回 admin123 后照样标记首启完成）
+	if isWeakPassword(input.NewPassword) {
+		return errors.New("新密码过于简单（命中常见弱密码黑名单），请更换")
+	}
 	u, err := s.userRepo.GetByID(userID)
 	if err != nil {
 		return err

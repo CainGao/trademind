@@ -1,4 +1,4 @@
-// 系统设置页：数据备份/恢复管理（管理员）。
+// 系统设置页：安全设置（修改密码）+ 数据备份/恢复管理（管理员）。
 //
 // 备份策略：
 //   - 使用 SQLite VACUUM INTO 生成一致性快照，无需停服
@@ -6,8 +6,9 @@
 //   - 恢复为 CLI 操作（./trademind --restore <file>），需停服
 //
 // 「数据 100% 本地」是产品核心承诺，可备份是企业私有化底线能力。
+// 修改密码（gotcha #88）：admin 仍用默认密码时顶部横幅会引导到本页。
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import {
   Card,
   Table,
@@ -19,6 +20,8 @@ import {
   Alert,
   Tag,
   Tooltip,
+  Form,
+  Input,
 } from "antd";
 import {
   CloudUploadOutlined,
@@ -26,8 +29,11 @@ import {
   DeleteOutlined,
   ReloadOutlined,
   SafetyCertificateOutlined,
+  LockOutlined,
 } from "@ant-design/icons";
 import { backupApi, type BackupInfo } from "../../api/backup";
+import { setupApi } from "../../api/setup";
+import { useAuthStore } from "../../store/auth";
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -50,6 +56,114 @@ function formatTime(iso: string): string {
   });
 }
 
+interface PwdFormValues {
+  old_password: string;
+  new_password: string;
+  confirm_password: string;
+}
+
+// PasswordCard 修改管理员密码卡片（admin only）。
+function PasswordCard() {
+  const [form] = Form.useForm<PwdFormValues>();
+  const [changing, setChanging] = useState(false);
+  const { mustChangePassword, clearMustChangePassword } = useAuthStore();
+
+  const handleChangePassword = async (values: PwdFormValues) => {
+    setChanging(true);
+    try {
+      await setupApi.changePassword({
+        old_password: values.old_password,
+        new_password: values.new_password,
+      });
+      message.success("密码修改成功");
+      form.resetFields();
+      // 清除「仍在使用默认密码」提醒横幅
+      clearMustChangePassword();
+    } catch (e) {
+      const err = e as { message?: string };
+      message.error(`修改失败: ${err.message || "未知错误"}`);
+    } finally {
+      setChanging(false);
+    }
+  };
+
+  const onFinish = (values: PwdFormValues) => {
+    void handleChangePassword(values);
+  };
+
+  return (
+    <Card
+      title={
+        <Space>
+          <LockOutlined />
+          <span>安全设置</span>
+        </Space>
+      }
+      style={{ marginBottom: 16 }}
+    >
+      {mustChangePassword && (
+        <Alert
+          type="warning"
+          showIcon
+          style={{ marginBottom: 16 }}
+          message="检测到当前管理员仍在使用默认密码，请立即修改"
+        />
+      )}
+      <Form form={form} layout="vertical" onFinish={onFinish} style={{ maxWidth: 420 }}>
+        <Form.Item
+          name="old_password"
+          label="当前密码"
+          rules={[{ required: true, message: "请输入当前密码" }]}
+        >
+          <Input.Password placeholder="当前密码" autoComplete="current-password" />
+        </Form.Item>
+        <Form.Item
+          name="new_password"
+          label="新密码"
+          rules={[
+            { required: true, message: "请输入新密码" },
+            { min: 6, max: 64, message: "长度 6-64 位" },
+            ({ getFieldValue }) => ({
+              validator(_, value) {
+                if (!value || value !== getFieldValue("old_password")) {
+                  return Promise.resolve();
+                }
+                return Promise.reject(new Error("新密码不能与当前密码相同"));
+              },
+            }),
+          ]}
+        >
+          <Input.Password placeholder="新密码（6-64 位）" autoComplete="new-password" />
+        </Form.Item>
+        <Form.Item
+          name="confirm_password"
+          label="确认新密码"
+          dependencies={["new_password"]}
+          rules={[
+            { required: true, message: "请再次输入新密码" },
+            ({ getFieldValue }) => ({
+              validator(_, value) {
+                if (!value || value === getFieldValue("new_password")) {
+                  return Promise.resolve();
+                }
+                return Promise.reject(new Error("两次输入的密码不一致"));
+              },
+            }),
+          ]}
+        >
+          <Input.Password placeholder="再次输入新密码" autoComplete="new-password" />
+        </Form.Item>
+        <Text type="secondary" style={{ display: "block", marginBottom: 12 }}>
+          常见弱密码（如 admin123/123456）已被系统黑名单拦截，修改后不可改回。
+        </Text>
+        <Button type="primary" htmlType="submit" loading={changing}>
+          修改密码
+        </Button>
+      </Form>
+    </Card>
+  );
+}
+
 export default function SettingsPage() {
   const [backups, setBackups] = useState<BackupInfo[]>([]);
   const [loading, setLoading] = useState(false);
@@ -67,6 +181,13 @@ export default function SettingsPage() {
       setLoading(false);
     }
   }, []);
+
+  // 进入页面自动加载备份列表
+  //（修复存量 bug：此前无 useEffect，列表从不自动加载，只能手动点「刷新」，
+  //  老板首次进入看到「暂无备份」会误以为自动备份没有在工作）
+  useEffect(() => {
+    void fetchBackups();
+  }, [fetchBackups]);
 
   const handleCreate = async () => {
     setCreating(true);
@@ -163,6 +284,9 @@ export default function SettingsPage() {
       <Title level={4}>
         <SafetyCertificateOutlined /> 系统设置
       </Title>
+
+      {/* 修改密码卡片（gotcha #88 默认密码治理） */}
+      <PasswordCard />
 
       {/* 数据备份卡片 */}
       <Card

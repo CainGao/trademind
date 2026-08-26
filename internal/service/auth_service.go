@@ -9,6 +9,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/CainGao/trademind/internal/database"
 	"github.com/CainGao/trademind/internal/middleware"
 	"github.com/CainGao/trademind/internal/models"
 	"github.com/CainGao/trademind/internal/pkg/crypto"
@@ -23,6 +24,8 @@ var (
 	ErrUsernameTaken = errors.New("用户名已被占用")
 	// ErrUserInactive 用户已禁用。
 	ErrUserInactive = errors.New("账号已被禁用")
+	// ErrWeakPassword 密码命中弱密码黑名单（gotcha #88）。
+	ErrWeakPassword = errors.New("密码过于简单（命中常见弱密码黑名单），请更换")
 )
 
 // AuthService 认证业务。
@@ -53,11 +56,14 @@ type TokenPair struct {
 
 // UserInfo 返回给前端的用户信息（不含密码 hash）。
 type UserInfo struct {
-	ID        uint             `json:"id"`
-	Username  string           `json:"username"`
-	Nickname  string           `json:"nickname"`
-	Role      models.UserRole  `json:"role"`
-	Avatar    string           `json:"avatar"`
+	ID       uint            `json:"id"`
+	Username string          `json:"username"`
+	Nickname string          `json:"nickname"`
+	Role     models.UserRole `json:"role"`
+	Avatar   string          `json:"avatar"`
+	// MustChangePassword 登录时检测到 admin 仍在使用 seed 默认密码时为 true。
+	// 前端据此显示改密提醒横幅（gotcha #88 默认密码治理）。
+	MustChangePassword bool `json:"must_change_password"`
 }
 
 // Login 校验账号密码，签发 Token 对。
@@ -94,6 +100,14 @@ func (s *AuthService) Login(input LoginInput, ip string) (*TokenPair, error) {
 	// 登录审计
 	s.auditRepo.Log(u.ID, "login", "user", &u.ID, "登录成功", ip)
 
+	// 默认密码检测（gotcha #88）：admin 仍用 seed 默认密码时置标志，
+	// 前端登录后显示改密提醒横幅。登录时明文在手，一次字符串比较零成本。
+	mustChange := u.Username == "admin" && input.Password == database.DefaultAdminPassword
+	if mustChange {
+		s.auditRepo.Log(u.ID, "weak_password_warning", "user", &u.ID,
+			"管理员仍在使用默认密码", ip)
+	}
+
 	return &TokenPair{
 		AccessToken:  access,
 		RefreshToken: refresh,
@@ -101,6 +115,7 @@ func (s *AuthService) Login(input LoginInput, ip string) (*TokenPair, error) {
 		User: UserInfo{
 			ID: u.ID, Username: u.Username, Nickname: u.Nickname,
 			Role: u.Role, Avatar: u.Avatar,
+			MustChangePassword: mustChange,
 		},
 	}, nil
 }
@@ -118,6 +133,10 @@ func (s *AuthService) Register(input RegisterInput) (*UserInfo, error) {
 	// 检查重名
 	if existing, _ := s.userRepo.GetByUsername(input.Username); existing != nil {
 		return nil, ErrUsernameTaken
+	}
+	// 弱密码黑名单拦截（gotcha #88）
+	if isWeakPassword(input.Password) {
+		return nil, ErrWeakPassword
 	}
 
 	hash, err := crypto.HashPassword(input.Password)

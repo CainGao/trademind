@@ -23,6 +23,8 @@ export interface UserInfo {
   nickname: string;
   role: UserRole;
   avatar?: string;
+  /** admin 仍在使用 seed 默认密码时为 true（登录检测，gotcha #88） */
+  must_change_password?: boolean;
 }
 
 export interface LoginInput {

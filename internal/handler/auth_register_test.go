@@ -123,7 +123,8 @@ func TestAuth_Register_AdminCreatesUser(t *testing.T) {
 	r, _, mgr := setupAuthEngine(t, db)
 
 	adminTok := tokenFor(t, mgr, 1, "admin", models.RoleAdmin)
-	w := doPost(r, "/api/auth/register", adminTok, `{"username":"newbie","password":"123456","nickname":"新人"}`)
+	// 注意：弱密码（如 123456）已被黑名单拦截（gotcha #88），正常注册场景用强密码
+	w := doPost(r, "/api/auth/register", adminTok, `{"username":"newbie","password":"Str0ng!Pass22","nickname":"新人"}`)
 	if w.Code != http.StatusCreated {
 		t.Fatalf("admin 注册: got status %d, want %d, body: %s", w.Code, http.StatusCreated, w.Body.String())
 	}
@@ -145,6 +146,27 @@ func TestAuth_Register_RejectsInvalidRole(t *testing.T) {
 	w := doPost(r, "/api/auth/register", adminTok, `{"username":"hacker","password":"123456","role":"superadmin"}`)
 	if w.Code != http.StatusBadRequest {
 		t.Fatalf("非法 role: got status %d, want 400, body: %s", w.Code, w.Body.String())
+	}
+}
+
+// TestAuth_Register_RejectsWeakPassword 弱密码黑名单在 handler 层正确映射为 400
+//（gotcha #88：修复前 service 的 ErrWeakPassword 被统一 InternalError 500 吞掉）。
+func TestAuth_Register_RejectsWeakPassword(t *testing.T) {
+	db := setupAuthTestDB(t)
+	r, _, mgr := setupAuthEngine(t, db)
+
+	adminTok := tokenFor(t, mgr, 1, "admin", models.RoleAdmin)
+	for _, pw := range []string{"123456", "password", "admin888"} {
+		w := doPost(r, "/api/auth/register", adminTok, `{"username":"weakie","password":"`+pw+`"}`)
+		if w.Code != http.StatusBadRequest {
+			t.Fatalf("弱密码 %q: got status %d, want 400, body: %s", pw, w.Code, w.Body.String())
+		}
+	}
+	// 确认没有用户被创建
+	var cnt int64
+	db.Model(&models.User{}).Where("username = ?", "weakie").Count(&cnt)
+	if cnt != 0 {
+		t.Fatalf("弱密码注册不应创建用户，但发现 %d 条", cnt)
 	}
 }
 
