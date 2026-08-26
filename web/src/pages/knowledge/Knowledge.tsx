@@ -35,6 +35,7 @@ import {
   SearchOutlined,
   RobotOutlined,
   DeleteOutlined,
+  ReloadOutlined,
   InboxOutlined,
   CopyOutlined,
   DatabaseOutlined,
@@ -83,6 +84,7 @@ export default function Knowledge() {
   const [stats, setStats] = useState<KnowledgeStats | null>(null);
   const [pasteOpen, setPasteOpen] = useState(false);
   const [pasting, setPasting] = useState(false);
+  const [reembedding, setReembedding] = useState<number | null>(null);
   const [form] = Form.useForm();
 
   // 检索状态
@@ -163,6 +165,21 @@ export default function Knowledge() {
     } catch (e) {
       const err = e as { message?: string };
       message.error(`删除失败: ${err.message}`);
+    }
+  };
+
+  // 重新向量化（Embedding 失败后一键重试）
+  const handleReembed = async (id: number) => {
+    setReembedding(id);
+    try {
+      const resp = await knowledgeApi.reembed(id);
+      message.success(`重新向量化完成，生成 ${resp.chunk_count} 个知识片段`);
+    } catch (e) {
+      const err = e as { message?: string };
+      message.warning(`重试失败: ${err.message}`);
+    } finally {
+      setReembedding(null);
+      load(); // 无论成败都刷新列表（失败原因会更新到 parse_error）
     }
   };
 
@@ -296,6 +313,20 @@ export default function Knowledge() {
                       renderItem={(item) => (
                         <List.Item
                           actions={[
+                            ...(item.status === "failed" &&
+                            item.file_type !== "paste"
+                              ? [
+                                  <Button
+                                    key="reembed"
+                                    size="small"
+                                    icon={<ReloadOutlined />}
+                                    loading={reembedding === item.id}
+                                    onClick={() => handleReembed(item.id)}
+                                  >
+                                    重试向量化
+                                  </Button>,
+                                ]
+                              : []),
                             <Popconfirm
                               key="del"
                               title="确认删除？"

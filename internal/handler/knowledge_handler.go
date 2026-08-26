@@ -46,6 +46,7 @@ func (h *KnowledgeHandler) RegisterRoutes(rg *gin.RouterGroup) {
 	kb.GET("/files", h.ListFiles)
 	kb.GET("/files/:id", h.GetFile)
 	kb.DELETE("/files/:id", h.DeleteFile)
+	kb.POST("/files/:id/reembed", h.ReembedFile)
 	kb.POST("/search", h.Search)
 	kb.POST("/chat", h.Chat)
 	kb.GET("/stats", h.Stats)
@@ -170,6 +171,23 @@ func (h *KnowledgeHandler) DeleteFile(c *gin.Context) {
 		return
 	}
 	response.Success(c, gin.H{"deleted": true})
+}
+
+// ReembedFile 重新向量化文件（Embedding 失败后换真实 Key 一键重试）。
+// POST /api/knowledge/files/:id/reembed
+func (h *KnowledgeHandler) ReembedFile(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		response.BadRequest(c, "id 非法")
+		return
+	}
+	result, err := h.svc.ReembedFile(uint(id))
+	if err != nil {
+		// Embedding 失败是常见业务场景（Key 无效/网络不通），返回 400 而非 500
+		response.BadRequest(c, "重新向量化失败: "+err.Error())
+		return
+	}
+	response.Success(c, result)
 }
 
 // SearchRequest 语义检索请求体。

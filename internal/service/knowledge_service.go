@@ -435,6 +435,35 @@ func (s *KnowledgeService) DeleteFile(id uint) error {
 	return nil
 }
 
+// ReembedFile 重新解析并向量化已有文件（用于 Embedding 失败后的恢复重试）。
+// 仅对上传类文件有效（粘贴文本无物理文件）；重跑前先清旧切片保证幂等。
+// 场景：用户先配了无效 AI Key 导致文件 failed，换上真实 Key 后无需重新上传，
+// 一键重试即可恢复（物理文件始终保留在 runtime/files/ 下）。
+func (s *KnowledgeService) ReembedFile(id uint) (*UploadResult, error) {
+	file, err := s.fileRepo.FindByID(id)
+	if err != nil {
+		return nil, fmt.Errorf("文件不存在: %w", err)
+	}
+	if file.StoredPath == "" {
+		return nil, errors.New("粘贴文本无物理文件，请删除后重新粘贴")
+	}
+	if _, err := os.Stat(file.StoredPath); err != nil {
+		s.markFailed(file, "物理文件已丢失: "+file.StoredPath)
+		return nil, fmt.Errorf("物理文件已丢失，请重新上传: %w", err)
+	}
+	// 清除旧切片（幂等：ready 文件重跑也不残留旧向量）
+	if err := s.chunkRepo.DeleteByFile(id); err != nil {
+		return nil, fmt.Errorf("清除旧切片失败: %w", err)
+	}
+	// 重置状态后走完整的 解析→切片→向量化 流程
+	file.Status = models.FileStatusProcessing
+	file.ParseError = ""
+	if err := s.fileRepo.Update(file); err != nil {
+		return nil, fmt.Errorf("更新文件状态失败: %w", err)
+	}
+	return s.processFile(file, file.StoredPath)
+}
+
 // KnowledgeStats 知识库总览统计。
 type KnowledgeStats struct {
 	FileCount   int64 `json:"file_count"`   // 文件总数

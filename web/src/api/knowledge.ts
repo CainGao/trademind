@@ -80,6 +80,13 @@ export const knowledgeApi = {
     );
   },
 
+  /** 重新向量化（Embedding 失败后换有效 Key 一键重试） */
+  reembed(id: number) {
+    return client.post<unknown, UploadResult>(
+      `/knowledge/files/${id}/reembed`
+    );
+  },
+
   /** 语义检索 */
   search(query: string, fileId?: number, topK?: number) {
     return client.post<unknown, { results: SearchResult[]; count: number }>(
