@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"log"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -56,7 +57,13 @@ func (s *SchedulerService) SetBackupService(svc *BackupService) {
 const (
 	defaultBackupCron         = "0 2 * * *"  // 每天凌晨 2:00
 	defaultBackupRetentionDay = 14           // 自动备份保留 14 天
-	backupCatchUpThreshold    = 20 * time.Hour // 超过 20h 没有自动备份就补跑（桌面应用深夜常没开机，cron 会漏）
+	backupCatchUpThreshold    = 20 * time.Hour // 非日频 cron 的补跑回退阈值（日频走精确判定）
+)
+
+// 日报 cron 时刻（写死 18:00）。注册与启动补跑共用，防两处失同步。
+const (
+	reportCronHour   = 18
+	reportCronMinute = 0
 )
 
 // getBackupCron 备份 cron 表达式（settings: backup_cron，缺省/非法回退默认）。
@@ -68,6 +75,56 @@ func (s *SchedulerService) getBackupCron() string {
 		log.Printf("[scheduler] backup_cron 配置非法（%q），回退默认 %s", v.Value, defaultBackupCron)
 	}
 	return defaultBackupCron
+}
+
+// parseDailyCronTime 从形如 "M H * * *" 的日频 cron 中提取 (hour, minute)。
+// settings 里的 backup_cron 是用户可改的，遇到非日频（周频/月频）或含步进、列表、
+// 范围的表达式（"0 */6 * * *"、"0 2,4 * * *"）时返回 false，调用方回退阈值启发式。
+func parseDailyCronTime(expr string) (int, int, bool) {
+	fields := strings.Fields(expr)
+	if len(fields) != 5 || fields[2] != "*" || fields[3] != "*" || fields[4] != "*" {
+		return 0, 0, false
+	}
+	h, errH := strconv.Atoi(fields[1])
+	m, errM := strconv.Atoi(fields[0])
+	if errH != nil || errM != nil || h < 0 || h > 23 || m < 0 || m > 59 {
+		return 0, 0, false
+	}
+	return h, m, true
+}
+
+// reportCatchUpDue 判断启动时是否需要补跑当日日报（gotcha #92）。
+// 语义：日报 cron 时刻（18:00）已过 且 当天还没有日报（含 fallback）→ 补。
+// 18:00 未到（等 cron 正常跑）或当天已产出 → 不补。
+func reportCatchUpDue(now time.Time, hasTodayReport bool) bool {
+	scheduled := time.Date(now.Year(), now.Month(), now.Day(), reportCronHour, reportCronMinute, 0, 0, now.Location())
+	if !now.After(scheduled) {
+		return false
+	}
+	return !hasTodayReport
+}
+
+// backupCatchUpDue 判断启动时是否需要补跑自动备份（gotcha #91 精确化）。
+//
+// 旧行为（20h 阈值）的缺陷：凌晨 cron 已正常跑过（如 02:00），晚上 22 点重启时
+// 间隔恰好 20h+ 踩线，又冗余补一份——同一天两份备份，14 天保留虽会清但语义不准。
+//
+// 新语义：对日频 cron，取「最近一个已到达的计划时刻」（今天 HH:MM，若今天还没到
+// 则昨天 HH:MM），最新一份自动备份早于该时刻才补跑。即：当天 cron 时刻已过且当天
+// 无备份 → 补；当天已有备份 / 今天的时刻还没到（cron 马上会跑）→ 不补。
+// 非日频或解析失败的表达式回退 20h 阈值（宁可多备不可漏备）。
+func backupCatchUpDue(latest time.Time, hasBackup bool, cronExpr string, now time.Time) bool {
+	if !hasBackup {
+		return true // 从未备份过，首启立即补一份
+	}
+	if h, m, ok := parseDailyCronTime(cronExpr); ok {
+		scheduled := time.Date(now.Year(), now.Month(), now.Day(), h, m, 0, 0, now.Location())
+		if now.Before(scheduled) {
+			scheduled = scheduled.AddDate(0, 0, -1) // 今天的时刻未到，看昨天的
+		}
+		return latest.Before(scheduled)
+	}
+	return now.Sub(latest) > backupCatchUpThreshold
 }
 
 // getBackupRetentionDays 自动备份保留天数（settings: backup_retention_days，缺省/非法回退默认）。
@@ -173,7 +230,8 @@ func (s *SchedulerService) Start() error {
 
 	// 注册日报任务（每天 18:00），仅当注入了 dailyReportSvc
 	if s.dailyReportSvc != nil {
-		if _, err := s.cron.AddFunc("0 18 * * *", func() {
+		reportCron := fmt.Sprintf("%d %d * * *", reportCronMinute, reportCronHour)
+		if _, err := s.cron.AddFunc(reportCron, func() {
 			defer func() {
 				if r := recover(); r != nil {
 					log.Printf("[scheduler] 日报任务 panic（已恢复）: %v", r)
@@ -194,7 +252,38 @@ func (s *SchedulerService) Start() error {
 		}); err != nil {
 			return fmt.Errorf("注册日报任务失败: %w", err)
 		}
-		log.Println("[scheduler] 已注册 report | cron=0 18 * * * (每天 18:00)")
+		log.Printf("[scheduler] 已注册 report | cron=%s (每天 %02d:%02d)", reportCron, reportCronHour, reportCronMinute)
+
+		// 日报启动补跑（gotcha #92）：18:00 时刻已过且当天无日报 → 立即补生成并推送。
+		// 场景（2026-08-27 实测）：老板 18:00 前关机/睡眠，cron 错过的触发点永不补跑，
+		// 当晚日报直接缺失。与备份补跑（gotcha #84/#91）同属「桌面部署启动收敛」哲学：
+		// 不能假设机器在 cron 时刻总是开机。
+		// 若 18:00 还没到则等 cron 正常跑；当天已有日报（含 fallback）则不重复。
+		go func() {
+			defer func() {
+				if r := recover(); r != nil {
+					log.Printf("[scheduler] 日报补跑 panic（已恢复）: %v", r)
+				}
+			}()
+			now := time.Now()
+			_, err := s.dailyReportSvc.GetByDate(now)
+			hasToday := err == nil // 查无记录返回 ErrRecordNotFound
+			if !reportCatchUpDue(now, hasToday) {
+				return
+			}
+			log.Println("[scheduler] 检测到当日日报缺失（18:00 已过），启动补跑")
+			report, err := s.dailyReportSvc.Generate("", models.TriggerCron)
+			if err != nil {
+				log.Printf("[scheduler] 日报补跑失败: %v", err)
+				return
+			}
+			// 自动推送（如已配置 webhook），与 18:00 cron 回调行为一致
+			if err := s.dailyReportSvc.DeliverToFeishu(report.ID); err != nil {
+				log.Printf("[scheduler] 日报补跑飞书推送跳过: %v", err)
+			} else {
+				log.Printf("[scheduler] 补跑日报 #%d 已推送到飞书", report.ID)
+			}
+		}()
 	}
 
 	// 注册每日自动备份任务（默认凌晨 2:00），仅当注入了 backupSvc。
@@ -215,7 +304,8 @@ func (s *SchedulerService) Start() error {
 		log.Printf("[scheduler] 已注册 backup | cron=%s | 保留 %d 天", backupCron, s.getBackupRetentionDays())
 
 		// 启动补跑：桌面应用深夜大概率没开机，凌晨 cron 常年漏跑。
-		// 若最近一份自动备份已超过阈值（默认 20h），启动时立即补一份。
+		// 判定语义（gotcha #91）：当天 cron 时刻已过且当天无自动备份才补，
+		// 不能只看「距上次备份 > 20h」——凌晨已备过 + 晚上重启会冗余补第二份。
 		// 异步执行，不阻塞调度器启动（gotcha #65：go func 必须可 recover，runBackup 内置）。
 		go func() {
 			defer func() {
@@ -223,9 +313,12 @@ func (s *SchedulerService) Start() error {
 					log.Printf("[scheduler] 备份补跑 panic（已恢复）: %v", r)
 				}
 			}()
-			if latest, ok, err := s.backupSvc.LatestAutoBackup(); err != nil {
+			latest, ok, err := s.backupSvc.LatestAutoBackup()
+			if err != nil {
 				log.Printf("[scheduler] 检查自动备份状态失败: %v", err)
-			} else if !ok || time.Since(latest.CreatedAt) > backupCatchUpThreshold {
+				return
+			}
+			if backupCatchUpDue(latest.CreatedAt, ok, s.getBackupCron(), time.Now()) {
 				s.runBackup("启动补跑")
 			}
 		}()
